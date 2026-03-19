@@ -1,0 +1,66 @@
+import { NextResponse } from "next/server";
+import { Resend } from "resend";
+import { Client } from "@notionhq/client";
+
+// This is a basic demonstration placeholder route for automation.
+// Since we don't have actual API keys, we will simulate the behavior
+// or gracefully handle the missing keys.
+
+export async function POST(req: Request) {
+  try {
+    const data = await req.json();
+    const { name, email, company, budget, message } = data;
+
+    // SIMULATED AUTOMATION LOGIC:
+    // 1. Send an email via Resend
+    if (process.env.RESEND_API_KEY) {
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      await resend.emails.send({
+        from: "Studio HaeTae <hello@studiohaetae.com>",
+        to: email,
+        subject: "[Studio HaeTae] 프로젝트 문의가 성공적으로 접수되었습니다.",
+        html: `<h1>안녕하세요, ${name}님!</h1><p>스튜디오 해태 비즈니스 빌더 팀입니다. 남겨주신 ${company} 프로젝트 문의를 성공적으로 확인했습니다.</p>`,
+      });
+    } else {
+      console.log("[SIMULATION] Resend skipped (No API Key). Email simulated sent to", email);
+    }
+
+    // 2. Insert Lead into Notion DB
+    if (process.env.NOTION_API_KEY && process.env.NOTION_DATABASE_ID) {
+      const notion = new Client({ auth: process.env.NOTION_API_KEY });
+      await notion.pages.create({
+        parent: { database_id: process.env.NOTION_DATABASE_ID },
+        properties: {
+          Name: { title: [{ text: { content: name } }] },
+          Email: { email: email },
+          Company: { rich_text: [{ text: { content: company } }] },
+          Budget: { select: { name: budget } },
+          Status: { status: { name: "New Lead" } }
+        },
+      });
+    } else {
+      console.log("[SIMULATION] Notion skipped (No API Key). Lead simulated created for", name);
+    }
+
+    // 3. Webhook Alert to Slack
+    if (process.env.SLACK_WEBHOOK_URL) {
+      await fetch(process.env.SLACK_WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: `🚀 *New Lead Alert*\n*Name:* ${name}\n*Company:* ${company}\n*Budget:* ${budget}\n*Email:* ${email}`,
+        }),
+      });
+    } else {
+      console.log("[SIMULATION] Slack skipped (No Webhook URL). Alert simulated for", company);
+    }
+
+    // Give the user a simulated delay for authentic feeling
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("API Error:", error);
+    return NextResponse.json({ error: "Failed to process request" }, { status: 500 });
+  }
+}
