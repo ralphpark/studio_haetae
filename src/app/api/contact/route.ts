@@ -9,7 +9,15 @@ import { Client } from "@notionhq/client";
 export async function POST(req: Request) {
   try {
     const data = await req.json();
-    const { name, email, company, budget, message } = data;
+    const {
+      name, email, company, phone,
+      projectType, projectPurpose, targetUser,
+      features, designStatus,
+      budget, timeline, maintenance,
+      referenceUrl, message,
+    } = data;
+
+    const featuresText = Array.isArray(features) ? features.join(", ") : features || "";
 
     // SIMULATED AUTOMATION LOGIC:
     // 1. Send an email via Resend
@@ -19,7 +27,12 @@ export async function POST(req: Request) {
         from: "Studio HaeTae <hello@studiohaetae.com>",
         to: email,
         subject: "[Studio HaeTae] 프로젝트 문의가 성공적으로 접수되었습니다.",
-        html: `<h1>안녕하세요, ${name}님!</h1><p>스튜디오 해태 비즈니스 빌더 팀입니다. 남겨주신 ${company} 프로젝트 문의를 성공적으로 확인했습니다.</p>`,
+        html: `<h1>안녕하세요, ${name}님!</h1>
+<p>스튜디오 해태 비즈니스 빌더 팀입니다. 남겨주신 ${company} 프로젝트 문의를 성공적으로 확인했습니다.</p>
+<hr/>
+<p><strong>프로젝트 유형:</strong> ${projectType}</p>
+<p><strong>예산:</strong> ${budget} | <strong>일정:</strong> ${timeline}</p>
+<p><strong>핵심 기능:</strong> ${featuresText}</p>`,
       });
     } else {
       console.log("[SIMULATION] Resend skipped (No API Key). Email simulated sent to", email);
@@ -48,7 +61,7 @@ export async function POST(req: Request) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: `🚀 *New Lead Alert*\n*Name:* ${name}\n*Company:* ${company}\n*Budget:* ${budget}\n*Email:* ${email}`,
+          text: `🚀 *New Lead Alert*\n*Name:* ${name}\n*Company:* ${company}\n*Type:* ${projectType}\n*Budget:* ${budget} | *Timeline:* ${timeline}\n*Features:* ${featuresText}\n*Email:* ${email}`,
         }),
       });
     } else {

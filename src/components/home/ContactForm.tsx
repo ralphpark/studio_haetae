@@ -4,8 +4,142 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 
+const TOTAL_STEPS = 5;
+
 const inputClass =
   "px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:border-white/30 outline-none transition-all placeholder:text-white/20 w-full";
+
+const selectClass =
+  "px-4 py-3 bg-[#111] border border-white/10 rounded-xl focus:border-white/30 outline-none transition-all text-white w-full";
+
+const PROJECT_TYPES = [
+  "웹사이트 (기업/브랜드)",
+  "웹 애플리케이션 (SaaS)",
+  "모바일 앱",
+  "기존 서비스 리뉴얼",
+  "기타",
+];
+
+const PROJECT_PURPOSES = [
+  "신규 사업 런칭",
+  "기존 시스템 교체",
+  "서비스 확장/고도화",
+  "MVP 검증",
+  "기타",
+];
+
+const TARGET_USERS = ["B2B (기업 고객)", "B2C (일반 사용자)", "내부 직원용", "기타"];
+
+const FEATURES = [
+  "회원가입/로그인",
+  "결제/구독",
+  "관리자 페이지",
+  "대시보드/통계",
+  "게시판/커뮤니티",
+  "채팅/메시징",
+  "검색/필터",
+  "알림 (이메일/푸시)",
+  "파일 업로드/관리",
+  "외부 API 연동",
+];
+
+const DESIGN_STATUSES = [
+  "디자인 시안이 있어요",
+  "레퍼런스/참고 사이트만 있어요",
+  "디자인도 함께 의뢰할게요",
+];
+
+const BUDGETS = [
+  "1천만 원 미만",
+  "1천만 ~ 3천만 원",
+  "3천만 ~ 5천만 원",
+  "5천만 ~ 1억 원",
+  "1억 원 이상",
+  "협의 필요",
+];
+
+const TIMELINES = [
+  "1개월 이내 (긴급)",
+  "1 ~ 3개월",
+  "3 ~ 6개월",
+  "6개월 이상",
+  "미정 (협의 필요)",
+];
+
+const MAINTENANCE_OPTIONS = [
+  "유지보수 필요 (월 단위)",
+  "유지보수 불필요 (납품 완료)",
+  "논의 후 결정",
+];
+
+interface FormData {
+  name: string;
+  email: string;
+  company: string;
+  phone: string;
+  projectType: string;
+  projectPurpose: string;
+  targetUser: string;
+  features: string[];
+  designStatus: string;
+  budget: string;
+  timeline: string;
+  maintenance: string;
+  referenceUrl: string;
+  message: string;
+}
+
+function ChipSelect({
+  options,
+  value,
+  onChange,
+  multiple = false,
+}: {
+  options: string[];
+  value: string | string[];
+  onChange: (val: string | string[]) => void;
+  multiple?: boolean;
+}) {
+  const handleClick = (option: string) => {
+    if (multiple) {
+      const arr = value as string[];
+      onChange(
+        arr.includes(option)
+          ? arr.filter((v) => v !== option)
+          : [...arr, option]
+      );
+    } else {
+      onChange(option === value ? "" : option);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((option) => {
+        const isSelected = multiple
+          ? (value as string[]).includes(option)
+          : value === option;
+        return (
+          <button
+            key={option}
+            type="button"
+            onClick={() => handleClick(option)}
+            className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+              isSelected
+                ? "bg-white text-black border-white"
+                : "bg-white/5 text-white/70 border-white/10 hover:border-white/30 hover:text-white"
+            }`}
+          >
+            {isSelected && multiple && (
+              <span className="mr-1.5">&#10003;</span>
+            )}
+            {option}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export function ContactForm() {
   const router = useRouter();
@@ -13,11 +147,20 @@ export function ContactForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     name: "",
     email: "",
     company: "",
+    phone: "",
+    projectType: "",
+    projectPurpose: "",
+    targetUser: "",
+    features: [],
+    designStatus: "",
     budget: "",
+    timeline: "",
+    maintenance: "",
+    referenceUrl: "",
     message: "",
   });
 
@@ -27,7 +170,26 @@ export function ContactForm() {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleNext = () => setStep((p) => Math.min(p + 1, 3));
+  const isStepValid = (): boolean => {
+    switch (step) {
+      case 1:
+        return !!(formData.name && formData.email && formData.company);
+      case 2:
+        return !!(formData.projectType && formData.projectPurpose && formData.targetUser);
+      case 3:
+        return !!(formData.features.length > 0 && formData.designStatus);
+      case 4:
+        return !!(formData.budget && formData.timeline && formData.maintenance);
+      case 5:
+        return true; // optional step
+      default:
+        return false;
+    }
+  };
+
+  const handleNext = () => {
+    if (isStepValid()) setStep((p) => Math.min(p + 1, TOTAL_STEPS));
+  };
   const handlePrev = () => setStep((p) => Math.max(p - 1, 1));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,7 +197,6 @@ export function ContactForm() {
     setIsSubmitting(true);
 
     try {
-      // 상담 데이터를 sessionStorage에 저장
       sessionStorage.setItem("pendingConsultation", JSON.stringify(formData));
       setIsSuccess(true);
     } catch (error) {
@@ -46,52 +207,101 @@ export function ContactForm() {
     }
   };
 
+  const stepAnim = {
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -10 },
+  };
+
   return (
-    <div className="w-full max-w-2xl mx-auto rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl overflow-hidden relative min-h-[400px]">
+    <div className="w-full max-w-2xl mx-auto rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl overflow-hidden relative min-h-[460px]">
+      {/* Progress bar */}
       <div className="absolute top-0 left-0 w-full h-1 bg-white/10">
         <motion.div
           className="h-full bg-white"
-          initial={{ width: "33%" }}
-          animate={{ width: `${(step / 3) * 100}%` }}
+          initial={{ width: "20%" }}
+          animate={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
           transition={{ duration: 0.5, ease: "easeInOut" }}
         />
       </div>
+
+      {/* Step indicator */}
+      {!isSuccess && (
+        <div className="flex justify-center gap-2 pt-8 pb-2">
+          {Array.from({ length: TOTAL_STEPS }, (_, i) => (
+            <div
+              key={i}
+              className={`w-2 h-2 rounded-full transition-all ${
+                i + 1 === step
+                  ? "bg-white w-6"
+                  : i + 1 < step
+                    ? "bg-white/60"
+                    : "bg-white/20"
+              }`}
+            />
+          ))}
+        </div>
+      )}
 
       <AnimatePresence mode="wait">
         {!isSuccess ? (
           <motion.form
             key={`step-${step}`}
-            onSubmit={step === 3 ? handleSubmit : (e) => { e.preventDefault(); handleNext(); }}
-            className="p-10 flex flex-col h-full justify-between"
+            onSubmit={
+              step === TOTAL_STEPS
+                ? handleSubmit
+                : (e) => {
+                    e.preventDefault();
+                    handleNext();
+                  }
+            }
+            className="px-8 pb-8 pt-4 sm:px-10 sm:pb-10 flex flex-col h-full justify-between"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
           >
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-5">
+              {/* Step 1: 기본 정보 */}
               {step === 1 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="flex flex-col gap-6"
-                >
-                  <h3 className="text-2xl font-bold">1. 기본 정보</h3>
-                  <p className="text-white/60 text-sm">
-                    스튜디오 해태와 함께할 파트너님의 정보를 알려주세요.
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-white/70">담당자 / 대표자명</label>
-                    <input
-                      name="name"
-                      required
-                      value={formData.name}
-                      onChange={handleChange}
-                      className={inputClass}
-                      placeholder="홍길동"
-                    />
+                <motion.div {...stepAnim} className="flex flex-col gap-5">
+                  <div>
+                    <h3 className="text-2xl font-bold">1. 기본 정보</h3>
+                    <p className="text-white/50 text-sm mt-1">
+                      파트너님의 정보를 알려주세요.
+                    </p>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-white/70">이메일 주소</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium text-white/70">
+                        담당자명 <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        name="name"
+                        required
+                        value={formData.name}
+                        onChange={handleChange}
+                        className={inputClass}
+                        placeholder="홍길동"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium text-white/70">
+                        연락처
+                      </label>
+                      <input
+                        name="phone"
+                        type="tel"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        className={inputClass}
+                        placeholder="010-1234-5678"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-white/70">
+                      이메일 <span className="text-red-400">*</span>
+                    </label>
                     <input
                       name="email"
                       type="email"
@@ -102,19 +312,10 @@ export function ContactForm() {
                       placeholder="hello@company.com"
                     />
                   </div>
-                </motion.div>
-              )}
-
-              {step === 2 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="flex flex-col gap-6"
-                >
-                  <h3 className="text-2xl font-bold">2. 비즈니스 세부사항</h3>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-white/70">회사 및 서비스명</label>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-white/70">
+                      회사/서비스명 <span className="text-red-400">*</span>
+                    </label>
                     <input
                       name="company"
                       required
@@ -124,66 +325,205 @@ export function ContactForm() {
                       placeholder="Company Inc."
                     />
                   </div>
+                </motion.div>
+              )}
+
+              {/* Step 2: 프로젝트 개요 */}
+              {step === 2 && (
+                <motion.div {...stepAnim} className="flex flex-col gap-5">
+                  <div>
+                    <h3 className="text-2xl font-bold">2. 프로젝트 개요</h3>
+                    <p className="text-white/50 text-sm mt-1">
+                      어떤 프로젝트를 구상하고 계신가요?
+                    </p>
+                  </div>
                   <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-white/70">프로젝트 예상 예산</label>
-                    <select
-                      name="budget"
-                      required
-                      value={formData.budget}
-                      onChange={handleChange}
-                      className="px-4 py-3 bg-[#111] border border-white/10 rounded-xl focus:border-white/30 outline-none transition-all text-white"
-                    >
-                      <option value="" disabled>예산을 선택해주세요</option>
-                      <option value="1천만 ~ 3천만 원">1천만 ~ 3천만 원</option>
-                      <option value="3천만 ~ 5천만 원">3천만 ~ 5천만 원</option>
-                      <option value="5천만 원 이상">5천만 원 이상 (엔터프라이즈)</option>
-                    </select>
+                    <label className="text-sm font-medium text-white/70">
+                      프로젝트 유형 <span className="text-red-400">*</span>
+                    </label>
+                    <ChipSelect
+                      options={PROJECT_TYPES}
+                      value={formData.projectType}
+                      onChange={(v) =>
+                        setFormData((prev) => ({ ...prev, projectType: v as string }))
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-white/70">
+                      프로젝트 목적 <span className="text-red-400">*</span>
+                    </label>
+                    <ChipSelect
+                      options={PROJECT_PURPOSES}
+                      value={formData.projectPurpose}
+                      onChange={(v) =>
+                        setFormData((prev) => ({ ...prev, projectPurpose: v as string }))
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-white/70">
+                      주 사용자 <span className="text-red-400">*</span>
+                    </label>
+                    <ChipSelect
+                      options={TARGET_USERS}
+                      value={formData.targetUser}
+                      onChange={(v) =>
+                        setFormData((prev) => ({ ...prev, targetUser: v as string }))
+                      }
+                    />
                   </div>
                 </motion.div>
               )}
 
+              {/* Step 3: 기능 & 디자인 */}
               {step === 3 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="flex flex-col gap-6"
-                >
-                  <h3 className="text-2xl font-bold">3. 프로젝트 내용</h3>
+                <motion.div {...stepAnim} className="flex flex-col gap-5">
+                  <div>
+                    <h3 className="text-2xl font-bold">3. 기능 & 디자인</h3>
+                    <p className="text-white/50 text-sm mt-1">
+                      필요한 기능을 모두 선택해주세요.
+                    </p>
+                  </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-medium text-white/70">
-                      원하시는 방향성이나 레퍼런스가 있나요?
+                      핵심 기능 <span className="text-white/40">(복수 선택)</span>{" "}
+                      <span className="text-red-400">*</span>
+                    </label>
+                    <ChipSelect
+                      options={FEATURES}
+                      value={formData.features}
+                      onChange={(v) =>
+                        setFormData((prev) => ({ ...prev, features: v as string[] }))
+                      }
+                      multiple
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-white/70">
+                      디자인 현황 <span className="text-red-400">*</span>
+                    </label>
+                    <ChipSelect
+                      options={DESIGN_STATUSES}
+                      value={formData.designStatus}
+                      onChange={(v) =>
+                        setFormData((prev) => ({ ...prev, designStatus: v as string }))
+                      }
+                    />
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Step 4: 예산 & 일정 */}
+              {step === 4 && (
+                <motion.div {...stepAnim} className="flex flex-col gap-5">
+                  <div>
+                    <h3 className="text-2xl font-bold">4. 예산 & 일정</h3>
+                    <p className="text-white/50 text-sm mt-1">
+                      프로젝트 예산과 일정을 알려주세요.
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-white/70">
+                      예상 예산 <span className="text-red-400">*</span>
+                    </label>
+                    <ChipSelect
+                      options={BUDGETS}
+                      value={formData.budget}
+                      onChange={(v) =>
+                        setFormData((prev) => ({ ...prev, budget: v as string }))
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-white/70">
+                      희망 일정 <span className="text-red-400">*</span>
+                    </label>
+                    <ChipSelect
+                      options={TIMELINES}
+                      value={formData.timeline}
+                      onChange={(v) =>
+                        setFormData((prev) => ({ ...prev, timeline: v as string }))
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-white/70">
+                      유지보수 <span className="text-red-400">*</span>
+                    </label>
+                    <ChipSelect
+                      options={MAINTENANCE_OPTIONS}
+                      value={formData.maintenance}
+                      onChange={(v) =>
+                        setFormData((prev) => ({ ...prev, maintenance: v as string }))
+                      }
+                    />
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Step 5: 추가 사항 */}
+              {step === 5 && (
+                <motion.div {...stepAnim} className="flex flex-col gap-5">
+                  <div>
+                    <h3 className="text-2xl font-bold">5. 추가 사항</h3>
+                    <p className="text-white/50 text-sm mt-1">
+                      참고할 레퍼런스나 추가 요청이 있으면 알려주세요.{" "}
+                      <span className="text-white/30">(선택)</span>
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-white/70">
+                      벤치마킹/레퍼런스 URL
+                    </label>
+                    <input
+                      name="referenceUrl"
+                      value={formData.referenceUrl}
+                      onChange={handleChange}
+                      className={inputClass}
+                      placeholder="https://example.com"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-white/70">
+                      추가 요청사항
                     </label>
                     <textarea
                       name="message"
-                      required
                       value={formData.message}
                       onChange={handleChange}
-                      rows={5}
+                      rows={4}
                       className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:border-white/30 outline-none transition-all placeholder:text-white/20 resize-none"
-                      placeholder="비즈니스 목표와 중요하게 생각하시는 기능들을 자유롭게 적어주세요."
+                      placeholder="차별화 포인트, 특수 요구사항, 법적/보안 제약 등 자유롭게 적어주세요."
                     />
                   </div>
                 </motion.div>
               )}
             </div>
 
-            <div className="flex justify-between mt-12">
+            {/* Navigation */}
+            <div className="flex justify-between mt-10">
               <button
                 type="button"
                 onClick={handlePrev}
                 className={`px-6 py-2 rounded-full text-sm font-medium transition-opacity ${
-                  step === 1 ? "opacity-0 pointer-events-none" : "opacity-100 hover:bg-white/10"
+                  step === 1
+                    ? "opacity-0 pointer-events-none"
+                    : "opacity-100 hover:bg-white/10"
                 }`}
               >
                 이전
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="px-6 py-2 bg-white text-black rounded-full font-medium active:scale-95 transition-all outline-none focus:ring-2 focus:ring-white/50 disabled:opacity-50"
+                disabled={isSubmitting || !isStepValid()}
+                className="px-6 py-2 bg-white text-black rounded-full font-medium active:scale-95 transition-all outline-none focus:ring-2 focus:ring-white/50 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {step === 3 ? (isSubmitting ? "처리 중..." : "제출하기") : "다음"}
+                {step === TOTAL_STEPS
+                  ? isSubmitting
+                    ? "처리 중..."
+                    : "제출하기"
+                  : "다음"}
               </button>
             </div>
           </motion.form>
@@ -201,7 +541,12 @@ export function ContactForm() {
                 viewBox="0 0 24 24"
                 stroke="currentColor"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={3}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             </div>
             <h3 className="text-3xl font-bold">상담 내용이 작성되었습니다</h3>
