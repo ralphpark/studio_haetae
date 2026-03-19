@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import { LogoutButton } from "@/components/portal/LogoutButton";
 
 export default async function PortalPage() {
   const supabase = await createClient();
@@ -12,13 +13,18 @@ export default async function PortalPage() {
     redirect("/login");
   }
 
+  const userName = user.user_metadata?.name || user.email;
+
   return (
     <div className="w-full max-w-7xl mx-auto px-6 py-24 flex flex-col gap-12">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-4xl font-bold tracking-tighter">Project Dashboard</h1>
-        <p className="text-white/60 text-lg">
-          Welcome back. Here is your project overview and progress.
-        </p>
+      <header className="flex items-start justify-between">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-4xl font-bold tracking-tighter">Project Dashboard</h1>
+          <p className="text-white/60 text-lg">
+            Welcome back, {userName}.
+          </p>
+        </div>
+        <LogoutButton />
       </header>
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
