@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
 import { Resend } from "resend";
 import { Client } from "@notionhq/client";
-
-// This is a basic demonstration placeholder route for automation.
-// Since we don't have actual API keys, we will simulate the behavior
-// or gracefully handle the missing keys.
 
 export async function POST(req: Request) {
   try {
@@ -19,8 +16,44 @@ export async function POST(req: Request) {
 
     const featuresText = Array.isArray(features) ? features.join(", ") : features || "";
 
-    // SIMULATED AUTOMATION LOGIC:
-    // 1. Send an email via Resend
+    // 1. Save to Supabase (linked to authenticated user)
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+      // Get next project number for this user
+      const { count } = await supabase
+        .from("projects")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
+      const projectNumber = (count || 0) + 1;
+
+      const { error: insertError } = await supabase.from("projects").insert({
+        user_id: user.id,
+        project_number: projectNumber,
+        name,
+        email,
+        company,
+        phone: phone || null,
+        project_type: projectType,
+        project_purpose: projectPurpose,
+        target_user: targetUser,
+        features: Array.isArray(features) ? features : [],
+        design_status: designStatus,
+        budget,
+        timeline,
+        maintenance,
+        reference_url: referenceUrl || null,
+        message: message || null,
+      });
+
+      if (insertError) {
+        console.error("Supabase insert error:", insertError);
+      }
+    }
+
+    // 2. Send an email via Resend
     if (process.env.RESEND_API_KEY) {
       const resend = new Resend(process.env.RESEND_API_KEY);
       await resend.emails.send({
@@ -38,7 +71,7 @@ export async function POST(req: Request) {
       console.log("[SIMULATION] Resend skipped (No API Key). Email simulated sent to", email);
     }
 
-    // 2. Insert Lead into Notion DB
+    // 3. Insert Lead into Notion DB
     if (process.env.NOTION_API_KEY && process.env.NOTION_DATABASE_ID) {
       const notion = new Client({ auth: process.env.NOTION_API_KEY });
       await notion.pages.create({
@@ -55,7 +88,7 @@ export async function POST(req: Request) {
       console.log("[SIMULATION] Notion skipped (No API Key). Lead simulated created for", name);
     }
 
-    // 3. Webhook Alert to Slack
+    // 4. Webhook Alert to Slack
     if (process.env.SLACK_WEBHOOK_URL) {
       await fetch(process.env.SLACK_WEBHOOK_URL, {
         method: "POST",
@@ -67,9 +100,6 @@ export async function POST(req: Request) {
     } else {
       console.log("[SIMULATION] Slack skipped (No Webhook URL). Alert simulated for", company);
     }
-
-    // Give the user a simulated delay for authentic feeling
-    await new Promise((resolve) => setTimeout(resolve, 1500));
 
     return NextResponse.json({ success: true });
   } catch (error) {
