@@ -21,7 +21,7 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://studiohaetae.com"),
+  metadataBase: new URL("https://haetae.studio"),
   title: {
     template: "%s | Studio HaeTae",
     default: "Studio HaeTae | Guardians of Innovation",
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "ko_KR",
-    url: "https://studiohaetae.com",
+    url: "https://haetae.studio",
     title: "Studio HaeTae | Premium Web Agency",
     description: "비즈니스의 수호자, 기술의 완성. 12년차 CTO 출신 풀스택 파트너.",
     siteName: "Studio HaeTae",
