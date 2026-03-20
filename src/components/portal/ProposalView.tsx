@@ -120,7 +120,9 @@ function DocumentCard({
           <p className="text-white/50 text-sm mt-1">
             {isConfirmed
               ? "상세 기획서와 견적서가 확정되었습니다."
-              : isInProgress
+              : isInProgress && !hasGeneratedDocs
+              ? "AI가 기획서와 견적서를 생성하고 있습니다..."
+              : isInProgress && hasGeneratedDocs
               ? "AI가 기획서를 작성했습니다. 검토 후 확정되면 미팅 예약이 가능합니다."
               : hasGeneratedDocs || hasDocuments
               ? "상세 기획서와 견적서가 준비되었습니다."
@@ -305,7 +307,10 @@ export function ProposalView({
 }) {
   const [proposal, setProposal] = useState<Proposal | null>(initialProposal);
   const [currentStep, setCurrentStep] = useState(step);
+  const [currentPlanningDoc, setCurrentPlanningDoc] = useState<PlanningDoc | null>(planningDoc || null);
+  const [currentEstimate, setCurrentEstimate] = useState<Estimate | null>(estimate || null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingDocs, setIsGeneratingDocs] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState("");
 
@@ -334,12 +339,34 @@ export function ProposalView({
       setProposal(newProposal);
       if (currentStep < 1) setCurrentStep(1);
       setShowModal(true);
+
+      // 백그라운드: 기획서/견적서 자동 생성
+      generateDocs();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "잠시 후 다시 확인해주세요."
       );
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const generateDocs = async () => {
+    setIsGeneratingDocs(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/generate-docs`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        const { planningDoc: newPlanningDoc, estimate: newEstimate } = await res.json();
+        setCurrentPlanningDoc(newPlanningDoc);
+        setCurrentEstimate(newEstimate);
+        if (currentStep < 2) setCurrentStep(2);
+      }
+    } catch (err) {
+      console.error("Generate docs error:", err);
+    } finally {
+      setIsGeneratingDocs(false);
     }
   };
 
@@ -396,10 +423,10 @@ export function ProposalView({
       {currentStep >= 1 && (
         <DocumentCard
           documentUrls={documentUrls || null}
-          planningDoc={planningDoc}
-          estimate={estimate}
+          planningDoc={currentPlanningDoc}
+          estimate={currentEstimate}
           isConfirmed={docsReady}
-          isInProgress={docsInProgress}
+          isInProgress={docsInProgress || isGeneratingDocs}
         />
       )}
 

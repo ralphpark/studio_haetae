@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { Mistral } from "@mistralai/mistralai";
 import { appendProposalToNotion } from "@/utils/notion";
-import { triggerN8nWorkflow } from "@/utils/n8n";
 
 const SYSTEM_PROMPT = `당신은 'Studio HaeTae'의 시니어 프로젝트 매니저입니다.
 12년간 100개 이상의 외주 프로젝트를 성공적으로 납품한 경험이 있습니다.
@@ -137,31 +136,6 @@ ${project.message ? `- 추가 요청: ${project.message}` : ""}
       } catch (err) {
         console.error("[NOTION] Append error:", err);
       }
-    }
-
-    // Trigger n8n: 제안서 완료 → 기획서/견적서 자동 생성 → Notion 기록
-    try {
-      await triggerN8nWorkflow({
-        projectId: id,
-        notionPageId: project.notion_page_id,
-        company: project.company,
-        projectType: project.project_type,
-        projectPurpose: project.project_purpose,
-        targetUser: project.target_user,
-        features: Array.isArray(project.features) ? project.features : [],
-        designStatus: project.design_status,
-        budget: project.budget,
-        timeline: project.timeline,
-        maintenance: project.maintenance,
-        referenceUrl: project.reference_url || undefined,
-        message: project.message || undefined,
-        clientName: project.name,
-        clientEmail: project.email,
-        proposalTitle: proposal.title,
-        proposalSections: proposal.sections,
-      });
-    } catch (err) {
-      console.error("[N8N] Trigger error (non-blocking):", err);
     }
 
     return NextResponse.json({ success: true, proposal });
