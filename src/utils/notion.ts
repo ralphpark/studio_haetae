@@ -51,6 +51,9 @@ export async function createNotionProjectPage(data: ProjectData): Promise<string
         "이름": {
           title: [{ text: { content: `${data.company} - 프로젝트 ${data.projectNumber}` } }],
         },
+        "날짜": {
+          date: { start: new Date().toISOString().split("T")[0] },
+        },
       },
       children: [
         {
