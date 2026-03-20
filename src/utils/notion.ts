@@ -127,8 +127,10 @@ export async function appendProposalToNotion(
   if (!notion || !notionPageId) return false;
 
   try {
-    // Find "AI 제안서" heading and remove placeholder
+    // Find "AI 제안서" heading block ID and placeholder to delete
     const blocks = await notion.blocks.children.list({ block_id: notionPageId });
+    let headingBlockId: string | null = null;
+    let placeholderBlockId: string | null = null;
     let foundHeading = false;
 
     for (const block of blocks.results) {
@@ -139,20 +141,27 @@ export async function appendProposalToNotion(
       ) {
         const heading = block.heading_2 as { rich_text: Array<{ plain_text: string }> };
         if (heading.rich_text?.[0]?.plain_text === "AI 제안서") {
+          headingBlockId = block.id;
           foundHeading = true;
           continue;
         }
       }
-      // Delete placeholder paragraph right after "AI 제안서" heading
       if (foundHeading && "type" in block && block.type === "paragraph") {
         const para = block.paragraph as { rich_text: Array<{ plain_text: string }> };
         if (para.rich_text?.[0]?.plain_text?.includes("제안서 생성 시")) {
-          await notion.blocks.delete({ block_id: block.id });
+          placeholderBlockId = block.id;
         }
         break;
       }
       if (foundHeading && "type" in block && block.type !== "paragraph") break;
     }
+
+    // Delete placeholder
+    if (placeholderBlockId) {
+      await notion.blocks.delete({ block_id: placeholderBlockId });
+    }
+
+    if (!headingBlockId) return false;
 
     // Build proposal content blocks
     const children: Parameters<typeof notion.blocks.children.append>[0]["children"] = [];
@@ -174,10 +183,11 @@ export async function appendProposalToNotion(
       );
     }
 
-    // Append to the page directly (not to a heading block)
+    // Append right after the "AI 제안서" heading using `after` parameter
     await notion.blocks.children.append({
       block_id: notionPageId,
       children,
+      after: headingBlockId,
     });
 
     return true;
