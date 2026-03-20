@@ -127,9 +127,9 @@ export async function appendProposalToNotion(
   if (!notion || !notionPageId) return false;
 
   try {
-    // Find "AI 제안서" heading block to append after
+    // Find "AI 제안서" heading and remove placeholder
     const blocks = await notion.blocks.children.list({ block_id: notionPageId });
-    let targetBlockId: string | null = null;
+    let foundHeading = false;
 
     for (const block of blocks.results) {
       if (
@@ -139,37 +139,23 @@ export async function appendProposalToNotion(
       ) {
         const heading = block.heading_2 as { rich_text: Array<{ plain_text: string }> };
         if (heading.rich_text?.[0]?.plain_text === "AI 제안서") {
-          targetBlockId = block.id;
-          break;
+          foundHeading = true;
+          continue;
         }
       }
-    }
-
-    if (!targetBlockId) return false;
-
-    // Remove placeholder paragraph after heading
-    const afterBlocks = await notion.blocks.children.list({ block_id: notionPageId });
-    let foundHeading = false;
-    for (const block of afterBlocks.results) {
-      if ("id" in block && block.id === targetBlockId) {
-        foundHeading = true;
-        continue;
-      }
+      // Delete placeholder paragraph right after "AI 제안서" heading
       if (foundHeading && "type" in block && block.type === "paragraph") {
-        await notion.blocks.delete({ block_id: block.id });
+        const para = block.paragraph as { rich_text: Array<{ plain_text: string }> };
+        if (para.rich_text?.[0]?.plain_text?.includes("제안서 생성 시")) {
+          await notion.blocks.delete({ block_id: block.id });
+        }
         break;
       }
       if (foundHeading && "type" in block && block.type !== "paragraph") break;
     }
 
-    // Append proposal sections
-    const children: Parameters<typeof notion.blocks.children.append>[0]["children"] = [
-      {
-        object: "block",
-        type: "heading_3",
-        heading_3: { rich_text: [{ text: { content: proposal.title } }] },
-      },
-    ];
+    // Build proposal content blocks
+    const children: Parameters<typeof notion.blocks.children.append>[0]["children"] = [];
 
     for (const section of proposal.sections) {
       children.push(
@@ -181,13 +167,16 @@ export async function appendProposalToNotion(
         {
           object: "block",
           type: "paragraph",
-          paragraph: { rich_text: [{ text: { content: section.content } }] },
+          paragraph: {
+            rich_text: [{ text: { content: section.content.slice(0, 2000) } }],
+          },
         }
       );
     }
 
+    // Append to the page directly (not to a heading block)
     await notion.blocks.children.append({
-      block_id: targetBlockId,
+      block_id: notionPageId,
       children,
     });
 
