@@ -260,17 +260,19 @@ export async function appendDocumentsToNotion(
 
       const children: Parameters<typeof notion.blocks.children.append>[0]["children"] = [];
       for (const section of docs.planningDoc.sections) {
+        const title = typeof section.title === "string" ? section.title : JSON.stringify(section.title || "");
+        const content = typeof section.content === "string" ? section.content : JSON.stringify(section.content || "", null, 2);
         children.push(
           {
             object: "block",
             type: "heading_3",
-            heading_3: { rich_text: [{ text: { content: String(section.title || "") } }] },
+            heading_3: { rich_text: [{ text: { content: title } }] },
           },
           {
             object: "block",
             type: "paragraph",
             paragraph: {
-              rich_text: [{ text: { content: String(section.content || "").slice(0, 2000) } }],
+              rich_text: [{ text: { content: content.slice(0, 2000) } }],
             },
           }
         );

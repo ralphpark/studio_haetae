@@ -1,17 +1,27 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { Mistral } from "@mistralai/mistralai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { appendDocumentsToNotion } from "@/utils/notion";
 
 function parseAIJson(text: unknown) {
   const str = typeof text === "string" ? text : "";
+  // Remove markdown code fences if present
+  const cleaned = str.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
   try {
-    return JSON.parse(str);
+    return JSON.parse(cleaned);
   } catch {
-    const match = str.match(/\{[\s\S]*\}/);
+    const match = cleaned.match(/\{[\s\S]*\}/);
     if (match) return JSON.parse(match[0]);
     return null;
   }
+}
+
+// content가 object면 문자열로 변환
+function ensureString(val: unknown): string {
+  if (typeof val === "string") return val;
+  if (val === null || val === undefined) return "";
+  if (typeof val === "object") return JSON.stringify(val, null, 2);
+  return String(val);
 }
 
 export async function POST(
@@ -39,32 +49,27 @@ export async function POST(
       return NextResponse.json({ error: "Project or proposal not found" }, { status: 404 });
     }
 
-    const apiKey = process.env.MISTRAL_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: "AI API key not configured" }, { status: 500 });
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+      return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500 });
     }
 
-    const client = new Mistral({ apiKey });
+    const genAI = new GoogleGenerativeAI(geminiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
     const features = Array.isArray(project.features) ? project.features.join(", ") : "";
 
     const proposalSummary = Array.isArray(project.proposal.sections)
       ? project.proposal.sections
           .map((s: { title: string; content: string }) =>
-            `${String(s.title || "")}: ${String(s.content || "").substring(0, 150)}`
+            `${ensureString(s.title)}: ${ensureString(s.content).substring(0, 150)}`
           ).join("\n")
       : "";
 
-    // 한 번의 AI 호출로 기획서 + 견적서 동시 생성 (타임아웃 방지)
-    const response = await client.chat.complete({
-      model: "mistral-small-latest",
-      messages: [
-        {
-          role: "system",
-          content: `당신은 Studio HaeTae의 시니어 PM이자 비즈니스 매니저입니다. 상세 기획서와 견적서를 한 번에 작성합니다. 반드시 한국어, 요청된 JSON 형식으로만 응답하세요.`,
-        },
-        {
-          role: "user",
-          content: `아래 프로젝트의 상세 기획서와 견적서를 작성해주세요.
+    const prompt = `당신은 Studio HaeTae의 시니어 PM이자 비즈니스 매니저입니다.
+아래 프로젝트의 상세 기획서와 견적서를 작성해주세요.
+반드시 한국어로, 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만 반환하세요.
+각 content 필드는 반드시 문자열(string)이어야 합니다.
 
 ## 프로젝트 정보
 - 회사명: ${project.company}
@@ -80,17 +85,17 @@ export async function POST(
 ## 제안서 요약
 ${proposalSummary}
 
-## 응답 형식 (반드시 이 JSON 구조로)
+## 응답 형식 (JSON만 반환)
 {
   "planningDoc": {
     "title": "상세 기획서 제목",
     "sections": [
-      { "title": "기능 명세", "content": "각 기능별 상세 요구사항" },
-      { "title": "기술 아키텍처", "content": "시스템 구조, 기술 스택" },
-      { "title": "데이터베이스 설계", "content": "엔티티, 관계" },
-      { "title": "UI/UX 설계 방향", "content": "화면 리스트, 플로우" },
-      { "title": "개발 일정", "content": "마일스톤별 일정" },
-      { "title": "테스트 및 QA", "content": "테스트 계획" }
+      { "title": "기능 명세", "content": "문자열로 된 상세 내용" },
+      { "title": "기술 아키텍처", "content": "문자열로 된 상세 내용" },
+      { "title": "데이터베이스 설계", "content": "문자열로 된 상세 내용" },
+      { "title": "UI/UX 설계 방향", "content": "문자열로 된 상세 내용" },
+      { "title": "개발 일정", "content": "문자열로 된 상세 내용" },
+      { "title": "테스트 및 QA", "content": "문자열로 된 상세 내용" }
     ]
   },
   "estimate": {
@@ -100,20 +105,35 @@ ${proposalSummary}
     ],
     "total": "총 견적 금액"
   }
-}`,
-        },
-      ],
-      responseFormat: { type: "json_object" },
-    });
+}`;
 
-    const result = parseAIJson(response.choices?.[0]?.message?.content);
+    const response = await model.generateContent(prompt);
+    const text = response.response.text();
+    const result = parseAIJson(text);
 
     if (!result) {
+      console.error("[GENERATE-DOCS] Failed to parse:", text?.substring(0, 500));
       return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 });
     }
 
+    // content가 객체인 경우 문자열로 변환
     const planningDoc = result.planningDoc || null;
+    if (planningDoc?.sections) {
+      for (const section of planningDoc.sections) {
+        section.title = ensureString(section.title);
+        section.content = ensureString(section.content);
+      }
+    }
+
     const estimate = result.estimate || null;
+    if (estimate?.items) {
+      for (const item of estimate.items) {
+        item.name = ensureString(item.name);
+        item.price = ensureString(item.price);
+        item.note = ensureString(item.note);
+      }
+      estimate.total = ensureString(estimate.total);
+    }
 
     // Supabase 저장
     await supabase
