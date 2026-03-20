@@ -33,7 +33,20 @@ export function ProjectCard({ project }: { project: Project }) {
   const [name, setName] = useState(project.project_name || defaultName);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleDelete = async () => {
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, { method: "DELETE" });
+      if (res.ok) setIsDeleted(true);
+    } catch {
+      // ignore
+    }
+  };
+
+  if (isDeleted) return null;
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -123,9 +136,38 @@ export function ProjectCard({ project }: { project: Project }) {
             )}
           </div>
         </div>
-        <span className="text-white/20 text-sm font-mono">
-          #{String(project.project_number).padStart(3, "0")}
-        </span>
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="text-white/20 text-sm font-mono">
+            #{String(project.project_number).padStart(3, "0")}
+          </span>
+          {showDeleteConfirm ? (
+            <div className="flex items-center gap-2">
+              <span className="text-white/40 text-xs">삭제하시겠습니까?</span>
+              <button
+                onClick={handleDelete}
+                className="text-red-400 text-xs hover:text-red-300 font-medium"
+              >
+                삭제
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="text-white/40 text-xs hover:text-white/60"
+              >
+                취소
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="text-white/15 hover:text-red-400/60 transition-colors"
+              title="프로젝트 삭제"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Overview Grid */}

@@ -58,3 +58,56 @@ export async function PATCH(
     return NextResponse.json({ error: "Failed to update" }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Get project to find notion_page_id
+    const { data: project } = await supabase
+      .from("projects")
+      .select("notion_page_id")
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .single();
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    // Delete from Supabase (cascade deletes meetings too)
+    const { error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Archive Notion page (Notion doesn't have hard delete via API)
+    if (project.notion_page_id && process.env.NOTION_API_KEY) {
+      const notion = new Client({ auth: process.env.NOTION_API_KEY });
+      notion.pages.update({
+        page_id: project.notion_page_id,
+        archived: true,
+      }).catch((err) => console.error("[NOTION] Archive error:", err));
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("API Error:", error);
+    return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
+  }
+}
