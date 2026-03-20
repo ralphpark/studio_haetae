@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { Mistral } from "@mistralai/mistralai";
+import { appendProposalToNotion } from "@/utils/notion";
 
 const SYSTEM_PROMPT = `당신은 'Studio HaeTae'의 시니어 프로젝트 매니저입니다.
 12년간 100개 이상의 외주 프로젝트를 성공적으로 납품한 경험이 있습니다.
@@ -127,6 +128,13 @@ ${project.message ? `- 추가 요청: ${project.message}` : ""}
       .update(updateData)
       .eq("id", id)
       .eq("user_id", user.id);
+
+    // Append proposal to Notion page
+    if (project.notion_page_id) {
+      appendProposalToNotion(project.notion_page_id, proposal).catch((err) =>
+        console.error("[NOTION] Background append error:", err)
+      );
+    }
 
     return NextResponse.json({ success: true, proposal });
   } catch (error) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { Resend } from "resend";
 import { Client } from "@notionhq/client";
+import { createNotionProjectPage } from "@/utils/notion";
 
 export async function POST(req: Request) {
   try {
@@ -29,6 +30,24 @@ export async function POST(req: Request) {
 
       const projectNumber = (count || 0) + 1;
 
+      // Create Notion page for this project
+      const notionPageId = await createNotionProjectPage({
+        company,
+        projectNumber,
+        projectType,
+        projectPurpose,
+        targetUser,
+        features: Array.isArray(features) ? features : [],
+        designStatus,
+        budget,
+        timeline,
+        maintenance,
+        referenceUrl: referenceUrl || undefined,
+        message: message || undefined,
+        clientEmail: email,
+        clientName: name,
+      });
+
       const { error: insertError } = await supabase.from("projects").insert({
         user_id: user.id,
         project_number: projectNumber,
@@ -46,6 +65,7 @@ export async function POST(req: Request) {
         maintenance,
         reference_url: referenceUrl || null,
         message: message || null,
+        notion_page_id: notionPageId,
       });
 
       if (insertError) {
