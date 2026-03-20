@@ -197,6 +197,156 @@ export async function appendProposalToNotion(
   }
 }
 
+/**
+ * Step 3: n8n에서 생성된 기획서/견적서를 Notion 페이지에 기록
+ */
+export async function appendDocumentsToNotion(
+  notionPageId: string,
+  docs: {
+    planningDoc?: { title: string; sections: { title: string; content: string }[] } | null;
+    estimate?: { title: string; items: { name: string; price: string; note: string }[]; total: string } | null;
+  }
+): Promise<boolean> {
+  const notion = getNotionClient();
+  if (!notion || !notionPageId) return false;
+
+  try {
+    const blocks = await notion.blocks.children.list({ block_id: notionPageId });
+
+    // Find "상세 기획서" heading and its placeholder
+    let planningHeadingId: string | null = null;
+    let planningPlaceholderId: string | null = null;
+    let estimateHeadingId: string | null = null;
+    let estimatePlaceholderId: string | null = null;
+    let currentTarget: "planning" | "estimate" | null = null;
+
+    for (const block of blocks.results) {
+      if ("type" in block && block.type === "heading_2" && "heading_2" in block) {
+        const heading = block.heading_2 as { rich_text: Array<{ plain_text: string }> };
+        const text = heading.rich_text?.[0]?.plain_text || "";
+
+        if (text === "상세 기획서") {
+          planningHeadingId = block.id;
+          currentTarget = "planning";
+          continue;
+        }
+        if (text === "견적서") {
+          estimateHeadingId = block.id;
+          currentTarget = "estimate";
+          continue;
+        }
+        currentTarget = null;
+      }
+
+      if (currentTarget && "type" in block && block.type === "paragraph") {
+        const para = block.paragraph as { rich_text: Array<{ plain_text: string }> };
+        const text = para.rich_text?.[0]?.plain_text || "";
+        if (text === "" || text.trim() === "") {
+          if (currentTarget === "planning" && !planningPlaceholderId) {
+            planningPlaceholderId = block.id;
+          } else if (currentTarget === "estimate" && !estimatePlaceholderId) {
+            estimatePlaceholderId = block.id;
+          }
+        }
+        currentTarget = null;
+      }
+    }
+
+    // Append 상세 기획서
+    if (docs.planningDoc && planningHeadingId) {
+      if (planningPlaceholderId) {
+        await notion.blocks.delete({ block_id: planningPlaceholderId });
+      }
+
+      const children: Parameters<typeof notion.blocks.children.append>[0]["children"] = [];
+      for (const section of docs.planningDoc.sections) {
+        children.push(
+          {
+            object: "block",
+            type: "heading_3",
+            heading_3: { rich_text: [{ text: { content: section.title } }] },
+          },
+          {
+            object: "block",
+            type: "paragraph",
+            paragraph: {
+              rich_text: [{ text: { content: section.content.slice(0, 2000) } }],
+            },
+          }
+        );
+      }
+
+      await notion.blocks.children.append({
+        block_id: notionPageId,
+        children,
+        after: planningHeadingId,
+      });
+    }
+
+    // Append 견적서
+    if (docs.estimate && estimateHeadingId) {
+      if (estimatePlaceholderId) {
+        await notion.blocks.delete({ block_id: estimatePlaceholderId });
+      }
+
+      const estimateChildren: Parameters<typeof notion.blocks.children.append>[0]["children"] = [
+        {
+          object: "block",
+          type: "table",
+          table: {
+            table_width: 3,
+            has_column_header: true,
+            children: [
+              {
+                object: "block",
+                type: "table_row",
+                table_row: {
+                  cells: [
+                    [{ text: { content: "항목" } }],
+                    [{ text: { content: "비용" } }],
+                    [{ text: { content: "비고" } }],
+                  ],
+                },
+              },
+              ...docs.estimate.items.map((item) => ({
+                object: "block" as const,
+                type: "table_row" as const,
+                table_row: {
+                  cells: [
+                    [{ text: { content: item.name } }],
+                    [{ text: { content: item.price } }],
+                    [{ text: { content: item.note } }],
+                  ],
+                },
+              })),
+            ],
+          },
+        },
+        {
+          object: "block",
+          type: "paragraph",
+          paragraph: {
+            rich_text: [
+              { text: { content: `합계: ${docs.estimate.total}`, annotations: { bold: true } } as never },
+            ],
+          },
+        },
+      ];
+
+      await notion.blocks.children.append({
+        block_id: notionPageId,
+        children: estimateChildren,
+        after: estimateHeadingId,
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.error("[NOTION] Append documents error:", error);
+    return false;
+  }
+}
+
 function tableRow(key: string, value: string) {
   return {
     object: "block" as const,

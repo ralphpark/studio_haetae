@@ -78,12 +78,34 @@ function Item({ label, value }: { label: string; value: string }) {
   );
 }
 
+interface PlanningDoc {
+  title: string;
+  sections: { title: string; content: string }[];
+}
+
+interface Estimate {
+  title: string;
+  items: { name: string; price: string; note: string }[];
+  total: string;
+}
+
 function DocumentCard({
   documentUrls,
+  planningDoc,
+  estimate,
+  isConfirmed,
+  isInProgress,
 }: {
   documentUrls: { proposal_url?: string; estimate_url?: string } | null;
+  planningDoc?: PlanningDoc | null;
+  estimate?: Estimate | null;
+  isConfirmed?: boolean;
+  isInProgress?: boolean;
 }) {
+  const [showPlanningDoc, setShowPlanningDoc] = useState(false);
+  const [showEstimate, setShowEstimate] = useState(false);
   const hasDocuments = documentUrls?.proposal_url || documentUrls?.estimate_url;
+  const hasGeneratedDocs = planningDoc || estimate;
 
   return (
     <motion.div
@@ -92,46 +114,146 @@ function DocumentCard({
       className="bg-white/5 border border-white/10 rounded-2xl p-6 sm:p-8"
     >
       <div className="flex items-start gap-4 mb-4">
-        <span className="text-white/10 text-3xl font-bold font-mono leading-none">03</span>
+        <span className="text-white/10 text-3xl font-bold font-mono leading-none">02</span>
         <div>
           <h3 className="text-lg font-bold">기획서 & 견적서</h3>
           <p className="text-white/50 text-sm mt-1">
-            {hasDocuments
+            {isConfirmed
+              ? "상세 기획서와 견적서가 확정되었습니다."
+              : isInProgress
+              ? "AI가 기획서를 작성했습니다. 검토 후 확정되면 미팅 예약이 가능합니다."
+              : hasGeneratedDocs || hasDocuments
               ? "상세 기획서와 견적서가 준비되었습니다."
-              : "미팅 완료 후 상세 기획서와 견적서를 공유해드리겠습니다."}
+              : "제안서 확인 후 AI가 자동으로 기획서와 견적서를 생성합니다."}
           </p>
         </div>
       </div>
-      {hasDocuments ? (
-        <div className="ml-0 sm:ml-12 mt-4 flex flex-wrap gap-3">
-          {documentUrls?.proposal_url && (
-            <a
-              href={documentUrls.proposal_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-5 py-2.5 bg-white text-black rounded-full text-sm font-medium hover:bg-white/90 active:scale-95 transition-all"
-            >
-              기획서 확인하기
-            </a>
-          )}
-          {documentUrls?.estimate_url && (
-            <a
-              href={documentUrls.estimate_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-5 py-2.5 bg-white/10 border border-white/10 rounded-full text-sm font-medium hover:bg-white/20 active:scale-95 transition-all"
-            >
-              견적서 확인하기
-            </a>
-          )}
-        </div>
-      ) : (
-        <div className="ml-0 sm:ml-12 mt-4">
+
+      <div className="ml-0 sm:ml-12 mt-4 flex flex-col gap-4">
+        {/* Generated docs buttons */}
+        {hasGeneratedDocs && (
+          <div className="flex flex-wrap gap-3">
+            {planningDoc && (
+              <button
+                onClick={() => setShowPlanningDoc(!showPlanningDoc)}
+                className="px-5 py-2.5 bg-white text-black rounded-full text-sm font-medium hover:bg-white/90 active:scale-95 transition-all"
+              >
+                {showPlanningDoc ? "기획서 닫기" : "기획서 확인하기"}
+              </button>
+            )}
+            {estimate && (
+              <button
+                onClick={() => setShowEstimate(!showEstimate)}
+                className="px-5 py-2.5 bg-white/10 border border-white/10 rounded-full text-sm font-medium hover:bg-white/20 active:scale-95 transition-all"
+              >
+                {showEstimate ? "견적서 닫기" : "견적서 확인하기"}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* External doc links */}
+        {hasDocuments && (
+          <div className="flex flex-wrap gap-3">
+            {documentUrls?.proposal_url && (
+              <a
+                href={documentUrls.proposal_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-5 py-2.5 bg-white/10 border border-white/10 rounded-full text-sm font-medium hover:bg-white/20 active:scale-95 transition-all"
+              >
+                기획서 문서 링크
+              </a>
+            )}
+            {documentUrls?.estimate_url && (
+              <a
+                href={documentUrls.estimate_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-5 py-2.5 bg-white/10 border border-white/10 rounded-full text-sm font-medium hover:bg-white/20 active:scale-95 transition-all"
+              >
+                견적서 문서 링크
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* No docs yet */}
+        {!hasGeneratedDocs && !hasDocuments && (
           <div className="px-4 py-3 bg-white/5 border border-white/5 rounded-xl text-white/30 text-sm">
             준비 중입니다
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Inline Planning Doc */}
+        <AnimatePresence>
+          {showPlanningDoc && planningDoc && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="bg-white/5 border border-white/10 rounded-xl p-6 flex flex-col gap-4">
+                <h4 className="text-lg font-bold">{planningDoc.title}</h4>
+                {planningDoc.sections.map((section, i) => (
+                  <div key={i}>
+                    <h5 className="text-sm font-semibold text-white/70 mb-1">{section.title}</h5>
+                    <p className="text-sm text-white/50 whitespace-pre-wrap leading-relaxed">
+                      {section.content}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Inline Estimate */}
+        <AnimatePresence>
+          {showEstimate && estimate && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+                <h4 className="text-lg font-bold mb-4">{estimate.title}</h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="text-left py-2 text-white/40 font-medium">항목</th>
+                        <th className="text-right py-2 text-white/40 font-medium">비용</th>
+                        <th className="text-left py-2 pl-4 text-white/40 font-medium">비고</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {estimate.items.map((item, i) => (
+                        <tr key={i} className="border-b border-white/5">
+                          <td className="py-2 text-white/70">{item.name}</td>
+                          <td className="py-2 text-right text-white/80 font-mono">{item.price}</td>
+                          <td className="py-2 pl-4 text-white/40">{item.note}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-white/20">
+                        <td className="py-3 font-bold">합계</td>
+                        <td className="py-3 text-right font-bold font-mono text-white">
+                          {estimate.total}
+                        </td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </motion.div>
   );
 }
@@ -145,6 +267,7 @@ function KickoffCard() {
     >
       <div className="flex items-start gap-4 mb-4">
         <span className="text-white/10 text-3xl font-bold font-mono leading-none">04</span>
+        {/* MeetingCard is 03, KickoffCard is 04 */}
         <div>
           <h3 className="text-lg font-bold">프로젝트 진행을 원하시나요?</h3>
           <p className="text-white/50 text-sm mt-1">
@@ -168,6 +291,8 @@ export function ProposalView({
   step,
   meeting,
   documentUrls,
+  planningDoc,
+  estimate,
 }: {
   projectId: string;
   initialProposal: Proposal | null;
@@ -175,6 +300,8 @@ export function ProposalView({
   step: number;
   meeting?: Meeting | null;
   documentUrls?: { proposal_url?: string; estimate_url?: string } | null;
+  planningDoc?: PlanningDoc | null;
+  estimate?: Estimate | null;
 }) {
   const [proposal, setProposal] = useState<Proposal | null>(initialProposal);
   const [currentStep, setCurrentStep] = useState(step);
@@ -217,8 +344,13 @@ export function ProposalView({
   };
 
   const handleMeetingBooked = () => {
-    if (currentStep < 2) setCurrentStep(2);
+    if (currentStep < 4) setCurrentStep(4);
   };
+
+  // Step 2: 기획서 초안 생성됨 (Notion 수정 대기)
+  // Step 3: 기획서 확정 완료 → 미팅 예약 활성화
+  const docsReady = currentStep >= 3;
+  const docsInProgress = currentStep === 2;
 
   return (
     <div className="flex flex-col gap-6">
@@ -260,8 +392,19 @@ export function ProposalView({
         </div>
       </motion.div>
 
-      {/* Step 2: 미팅 (제안서 생성 후 표시) */}
+      {/* Step 2~3: 기획서/견적서 (제안서 생성 후 표시) */}
       {currentStep >= 1 && (
+        <DocumentCard
+          documentUrls={documentUrls || null}
+          planningDoc={planningDoc}
+          estimate={estimate}
+          isConfirmed={docsReady}
+          isInProgress={docsInProgress}
+        />
+      )}
+
+      {/* Step 3+: 미팅 (기획서/견적서 확정 후 표시) */}
+      {docsReady && (
         <MeetingCard
           projectId={projectId}
           existingMeeting={meeting}
@@ -269,13 +412,8 @@ export function ProposalView({
         />
       )}
 
-      {/* Step 3: 기획서/견적서 (미팅 예약 후 표시) */}
-      {currentStep >= 2 && (
-        <DocumentCard documentUrls={documentUrls || null} />
-      )}
-
-      {/* Step 4: 킥오프 (기획서/견적서 활성화 후 표시) */}
-      {currentStep >= 4 && <KickoffCard />}
+      {/* Step 5: 킥오프 (미팅 예약 후 표시) */}
+      {currentStep >= 5 && <KickoffCard />}
 
       {/* Proposal Modal */}
       <AnimatePresence>

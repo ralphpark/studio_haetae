@@ -1,0 +1,217 @@
+{
+  "name": "HaeTae Docs Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "haetae-docs-generator",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {"id": "projectId", "name": "projectId", "value": "={{ $json.body.projectId }}", "type": "string"},
+            {"id": "notionPageId", "name": "notionPageId", "value": "={{ $json.body.notionPageId }}", "type": "string"},
+            {"id": "company", "name": "company", "value": "={{ $json.body.company }}", "type": "string"},
+            {"id": "projectType", "name": "projectType", "value": "={{ $json.body.projectType }}", "type": "string"},
+            {"id": "projectPurpose", "name": "projectPurpose", "value": "={{ $json.body.projectPurpose }}", "type": "string"},
+            {"id": "targetUser", "name": "targetUser", "value": "={{ $json.body.targetUser }}", "type": "string"},
+            {"id": "features", "name": "features", "value": "={{ $json.body.features?.join(', ') || '' }}", "type": "string"},
+            {"id": "budget", "name": "budget", "value": "={{ $json.body.budget }}", "type": "string"},
+            {"id": "timeline", "name": "timeline", "value": "={{ $json.body.timeline }}", "type": "string"},
+            {"id": "maintenance", "name": "maintenance", "value": "={{ $json.body.maintenance }}", "type": "string"},
+            {"id": "designStatus", "name": "designStatus", "value": "={{ $json.body.designStatus }}", "type": "string"},
+            {"id": "callbackUrl", "name": "callbackUrl", "value": "={{ $json.body.callbackUrl }}", "type": "string"},
+            {"id": "proposalSummary", "name": "proposalSummary", "value": "={{ $json.body.proposalSections?.map(s => s.title + ': ' + s.content?.substring(0, 200)).join('\\n') || '' }}", "type": "string"}
+          ]
+        }
+      },
+      "id": "set-data",
+      "name": "Extract Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mistral.ai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "Bearer JnvCTUDs0R8nCWeFNsXNdn8uBf09WHnD"},
+            {"name": "Content-Type", "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"mistral-large-latest\",\n  \"response_format\": { \"type\": \"json_object\" },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"당신은 Studio HaeTae의 시니어 프로젝트 매니저입니다. 12년간 100개 이상의 외주 프로젝트를 성공적으로 납품한 경험이 있습니다. 상세 기획서를 작성합니다. 반드시 한국어, JSON 형식으로만 응답하세요.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"상세 기획서를 작성해주세요.\\n\\n## 프로젝트 정보\\n- 회사명: {{ $json.company }}\\n- 유형: {{ $json.projectType }}\\n- 목적: {{ $json.projectPurpose }}\\n- 타겟: {{ $json.targetUser }}\\n- 기능: {{ $json.features }}\\n- 디자인: {{ $json.designStatus }}\\n- 예산: {{ $json.budget }}\\n- 일정: {{ $json.timeline }}\\n- 유지보수: {{ $json.maintenance }}\\n\\n## 제안서 요약\\n{{ $json.proposalSummary }}\\n\\n## 응답 형식\\n{\\n  \\\"title\\\": \\\"상세 기획서 제목\\\",\\n  \\\"sections\\\": [\\n    { \\\"title\\\": \\\"기능 명세\\\", \\\"content\\\": \\\"각 기능별 상세 요구사항, 화면 구성, 데이터 흐름\\\" },\\n    { \\\"title\\\": \\\"기술 아키텍처\\\", \\\"content\\\": \\\"시스템 구조, 기술 스택, API 설계\\\" },\\n    { \\\"title\\\": \\\"데이터베이스 설계\\\", \\\"content\\\": \\\"엔티티, 관계, 스키마\\\" },\\n    { \\\"title\\\": \\\"UI/UX 설계 방향\\\", \\\"content\\\": \\\"화면 리스트, 플로우, 반응형\\\" },\\n    { \\\"title\\\": \\\"개발 일정\\\", \\\"content\\\": \\\"마일스톤별 세부 일정\\\" },\\n    { \\\"title\\\": \\\"테스트 및 QA\\\", \\\"content\\\": \\\"테스트 범위, 방법론\\\" }\\n  ]\\n}\"\n    }\n  ]\n}",
+        "options": {"timeout": 120000}
+      },
+      "id": "generate-planning-doc",
+      "name": "Generate Planning Doc",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiResponse = $input.first().json;\nconst extractData = $('Extract Data').first().json;\n\nlet planningDoc = null;\nif (aiResponse.choices && aiResponse.choices[0]) {\n  const content = aiResponse.choices[0].message?.content || '{}';\n  try {\n    planningDoc = JSON.parse(content);\n  } catch (e) {\n    const match = content.match(/\\{[\\s\\S]*\\}/);\n    if (match) planningDoc = JSON.parse(match[0]);\n  }\n}\n\nreturn [{ json: { ...extractData, planningDoc } }];"
+      },
+      "id": "parse-planning",
+      "name": "Parse Planning Doc",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mistral.ai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "Bearer JnvCTUDs0R8nCWeFNsXNdn8uBf09WHnD"},
+            {"name": "Content-Type", "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"mistral-large-latest\",\n  \"response_format\": { \"type\": \"json_object\" },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"당신은 Studio HaeTae의 비즈니스 매니저입니다. 투명하고 합리적인 견적서를 작성합니다. 반드시 한국어, JSON 형식으로만 응답하세요.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"견적서를 작성해주세요.\\n\\n## 프로젝트 정보\\n- 회사명: {{ $json.company }}\\n- 유형: {{ $json.projectType }}\\n- 기능: {{ $json.features }}\\n- 디자인: {{ $json.designStatus }}\\n- 예산: {{ $json.budget }}\\n- 일정: {{ $json.timeline }}\\n- 유지보수: {{ $json.maintenance }}\\n\\n## 응답 형식\\n{\\n  \\\"title\\\": \\\"회사명 프로젝트 견적서\\\",\\n  \\\"items\\\": [\\n    { \\\"name\\\": \\\"항목명\\\", \\\"price\\\": \\\"금액\\\", \\\"note\\\": \\\"비고\\\" }\\n  ],\\n  \\\"total\\\": \\\"총 견적 금액\\\"\\n}\"\n    }\n  ]\n}",
+        "options": {"timeout": 120000}
+      },
+      "id": "generate-estimate",
+      "name": "Generate Estimate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiResponse = $input.first().json;\nconst prevData = $('Parse Planning Doc').first().json;\n\nlet estimate = null;\nif (aiResponse.choices && aiResponse.choices[0]) {\n  const content = aiResponse.choices[0].message?.content || '{}';\n  try {\n    estimate = JSON.parse(content);\n  } catch (e) {\n    const match = content.match(/\\{[\\s\\S]*\\}/);\n    if (match) estimate = JSON.parse(match[0]);\n  }\n}\n\n// Build Notion blocks for planning doc\nconst planningBlocks = [];\nif (prevData.planningDoc && prevData.planningDoc.sections) {\n  for (const section of prevData.planningDoc.sections) {\n    planningBlocks.push(\n      { object: 'block', type: 'heading_3', heading_3: { rich_text: [{ text: { content: String(section.title || '') } }] } },\n      { object: 'block', type: 'paragraph', paragraph: { rich_text: [{ text: { content: String(section.content || '').substring(0, 2000) } }] } }\n    );\n  }\n}\n\n// Build Notion blocks for estimate\nconst estimateRows = [];\nif (estimate && estimate.items) {\n  // Header row\n  estimateRows.push({\n    object: 'block', type: 'table_row',\n    table_row: { cells: [[{text:{content:'항목'}}],[{text:{content:'비용'}}],[{text:{content:'비고'}}]] }\n  });\n  for (const item of estimate.items) {\n    estimateRows.push({\n      object: 'block', type: 'table_row',\n      table_row: { cells: [[{text:{content:item.name}}],[{text:{content:item.price}}],[{text:{content:item.note}}]] }\n    });\n  }\n}\n\nreturn [{\n  json: {\n    projectId: prevData.projectId,\n    notionPageId: prevData.notionPageId,\n    callbackUrl: prevData.callbackUrl,\n    planningDoc: prevData.planningDoc,\n    estimate,\n    planningBlocks: JSON.stringify(planningBlocks),\n    estimateRows: JSON.stringify(estimateRows),\n    estimateTotal: estimate?.total || ''\n  }\n}];"
+      },
+      "id": "parse-estimate",
+      "name": "Parse & Build Notion Blocks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1440, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/blocks/{{ $json.notionPageId }}/children",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "Bearer ntn_L215679468028cEkJZ1adBJ0uw4ltPox0bEMwMBDdkXgUZ"},
+            {"name": "Notion-Version", "value": "2022-06-28"},
+            {"name": "Content-Type", "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"children\": {{ $json.planningBlocks }} }",
+        "options": {"timeout": 30000}
+      },
+      "id": "notion-planning",
+      "name": "Write Planning to Notion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1680, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/blocks/{{ $('Parse & Build Notion Blocks').first().json.notionPageId }}/children",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "Bearer ntn_L215679468028cEkJZ1adBJ0uw4ltPox0bEMwMBDdkXgUZ"},
+            {"name": "Notion-Version", "value": "2022-06-28"},
+            {"name": "Content-Type", "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"children\": [{ \"object\": \"block\", \"type\": \"table\", \"table\": { \"table_width\": 3, \"has_column_header\": true, \"children\": {{ $('Parse & Build Notion Blocks').first().json.estimateRows }} } }, { \"object\": \"block\", \"type\": \"paragraph\", \"paragraph\": { \"rich_text\": [{ \"text\": { \"content\": \"합계: {{ $('Parse & Build Notion Blocks').first().json.estimateTotal }}\" }, \"annotations\": { \"bold\": true } }] } }] }",
+        "options": {"timeout": 30000}
+      },
+      "id": "notion-estimate",
+      "name": "Write Estimate to Notion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1920, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Parse & Build Notion Blocks').first().json.callbackUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type", "value": "application/json"},
+            {"name": "x-n8n-secret", "value": "haetae-n8n-secret-2026"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"type\": \"docs-generated\",\n  \"projectId\": \"{{ $('Parse & Build Notion Blocks').first().json.projectId }}\",\n  \"planningDoc\": {{ JSON.stringify($('Parse & Build Notion Blocks').first().json.planningDoc) }},\n  \"estimate\": {{ JSON.stringify($('Parse & Build Notion Blocks').first().json.estimate) }}\n}",
+        "options": {"timeout": 30000}
+      },
+      "id": "callback-api",
+      "name": "Callback Draft to HaeTae",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2160, 300]
+    },
+    {
+      "parameters": {
+        "content": "## HaeTae Docs Generator v2\n\n**Trigger**: 제안서 생성 완료 시 webhook\n\n**Flow** (직렬):\n1. Webhook → 데이터 추출\n2. Mistral AI → 기획서 생성 → 파싱\n3. Mistral AI → 견적서 생성 → 파싱\n4. Notion API → 기획서 직접 기록\n5. Notion API → 견적서 직접 기록\n\n**이후**: Ralph가 Notion에서 수정\n→ 수정 완료 트리거 → 홈페이지 반영\n→ 미팅 예약 활성화\n\n**환경변수**:\n- MISTRAL_API_KEY\n- NOTION_API_KEY\n- N8N_CALLBACK_SECRET",
+        "height": 380,
+        "width": 340,
+        "color": 5
+      },
+      "id": "sticky-note",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [240, 480]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{"node": "Extract Data", "type": "main", "index": 0}]]
+    },
+    "Extract Data": {
+      "main": [[{"node": "Generate Planning Doc", "type": "main", "index": 0}]]
+    },
+    "Generate Planning Doc": {
+      "main": [[{"node": "Parse Planning Doc", "type": "main", "index": 0}]]
+    },
+    "Parse Planning Doc": {
+      "main": [[{"node": "Generate Estimate", "type": "main", "index": 0}]]
+    },
+    "Generate Estimate": {
+      "main": [[{"node": "Parse & Build Notion Blocks", "type": "main", "index": 0}]]
+    },
+    "Parse & Build Notion Blocks": {
+      "main": [[{"node": "Write Planning to Notion", "type": "main", "index": 0}]]
+    },
+    "Write Planning to Notion": {
+      "main": [[{"node": "Write Estimate to Notion", "type": "main", "index": 0}]]
+    },
+    "Write Estimate to Notion": {
+      "main": [[{"node": "Callback Draft to HaeTae", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

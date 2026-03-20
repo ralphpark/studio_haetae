@@ -44,11 +44,11 @@ export async function POST(
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
-    // Advance step
-    if (project.step < 2) {
+    // Advance step (미팅은 Step 3: 기획서/견적서 확정 이후에 활성화됨)
+    if (project.step < 4) {
       await supabase
         .from("projects")
-        .update({ step: 2 })
+        .update({ step: 4 })
         .eq("id", id)
         .eq("user_id", user.id);
     }

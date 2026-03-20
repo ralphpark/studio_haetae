@@ -80,6 +80,8 @@ export default async function ProjectDetailPage({
         step={project.step}
         meeting={meeting}
         documentUrls={project.document_urls}
+        planningDoc={project.planning_doc}
+        estimate={project.estimate}
       />
     </div>
   );
