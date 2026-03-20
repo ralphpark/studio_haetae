@@ -29,6 +29,16 @@ export default async function ProjectDetailPage({
     redirect("/portal");
   }
 
+  // Fetch meeting if exists
+  const { data: meetings } = await supabase
+    .from("meetings")
+    .select("preferred_date, preferred_time, method, contact_phone, status")
+    .eq("project_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const meeting = meetings?.[0] || null;
+
   return (
     <div className="w-full max-w-5xl mx-auto px-6 py-24 flex flex-col gap-8">
       {/* Back + Header */}
@@ -52,7 +62,7 @@ export default async function ProjectDetailPage({
         </p>
       </div>
 
-      {/* Proposal Section */}
+      {/* Step-based flow */}
       <ProposalView
         projectId={project.id}
         initialProposal={project.proposal}
@@ -67,6 +77,9 @@ export default async function ProjectDetailPage({
           timeline: project.timeline,
           maintenance: project.maintenance,
         }}
+        step={project.step}
+        meeting={meeting}
+        documentUrls={project.document_urls}
       />
     </div>
   );

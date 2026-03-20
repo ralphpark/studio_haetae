@@ -2,6 +2,18 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { Mistral } from "@mistralai/mistralai";
 
+const SYSTEM_PROMPT = `당신은 'Studio HaeTae'의 시니어 프로젝트 매니저입니다.
+12년간 100개 이상의 외주 프로젝트를 성공적으로 납품한 경험이 있습니다.
+클라이언트가 읽었을 때 '이 팀이라면 맡겨도 되겠다'는 신뢰감을 주는 제안서를 작성합니다.
+
+작성 원칙:
+- 클라이언트의 비즈니스 목표에 초점을 맞춥니다
+- 기술 용어는 반드시 쉬운 비유와 함께 설명합니다
+- 구체적인 수치와 기간을 포함합니다
+- 예산 범위에 맞는 현실적인 제안을 합니다
+- 항상 한국어로 응답합니다
+- 반드시 요청된 JSON 형식으로만 응답합니다`;
+
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -16,7 +28,6 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch project data
     const { data: project, error: fetchError } = await supabase
       .from("projects")
       .select("*")
@@ -31,7 +42,7 @@ export async function POST(
     const apiKey = process.env.MISTRAL_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "AI API key not configured. Set MISTRAL_API_KEY in environment variables." },
+        { error: "AI API key not configured" },
         { status: 500 }
       );
     }
@@ -42,7 +53,7 @@ export async function POST(
       ? project.features.join(", ")
       : project.features || "";
 
-    const prompt = `당신은 외주 개발 프로젝트 기획 전문가입니다. 아래 상담 데이터를 기반으로 클라이언트에게 제안할 프로젝트 기획서를 작성해주세요.
+    const userPrompt = `아래 상담 데이터를 기반으로 프로젝트 제안서를 작성해주세요.
 
 ## 상담 데이터
 - 회사명: ${project.company}
@@ -57,53 +68,34 @@ export async function POST(
 ${project.reference_url ? `- 레퍼런스: ${project.reference_url}` : ""}
 ${project.message ? `- 추가 요청: ${project.message}` : ""}
 
-## 기획서 작성 규칙
-1. 반드시 아래 JSON 형식으로만 응답해주세요 (마크다운이나 코드블록 없이 순수 JSON만).
-2. 각 섹션의 content는 전문적이면서도 클라이언트가 이해하기 쉬운 언어로 작성하세요.
-3. 기술 용어는 꼭 필요한 경우에만 사용하고, 비유나 쉬운 설명을 함께 제공하세요.
-4. 구체적인 수치, 기간, 기능 목록을 포함하세요.
-5. 각 섹션의 content는 최소 200자 이상으로 충분히 상세하게 작성하세요.
+## 섹션별 작성 지침
+1. **프로젝트 이해 및 분석**: 클라이언트의 비즈니스 배경을 분석하고, 프로젝트가 해결할 핵심 문제와 기대 효과를 구체적으로 서술하세요.
+2. **제안 전략 및 로드맵**: MVP 우선 전략으로 1차/2차/3차 오픈 범위를 나누고, 각 단계의 목표와 포함 기능을 명시하세요.
+3. **상세 개발 범위 및 기술 스택**: 요청된 기능별 상세 명세를 작성하고, 기술 스택은 '왜 이 기술이 이 프로젝트에 적합한지' 클라이언트 관점으로 설명하세요.
+4. **프로젝트 일정 및 관리 방안**: 희망 일정(${project.timeline}) 내에서 기획-디자인-개발-QA-배포 단계별 소요 기간을 제시하세요.
+5. **견적 및 예산**: 예산(${project.budget}) 범위 내에서 '기본형'과 '확장형' 두 가지 옵션을 제시하세요. 비용 산정 근거를 간략히 설명하세요.
+6. **팀 역량 및 지원**: Studio HaeTae의 강점과 유지보수(${project.maintenance}) 계획을 구체적으로 안내하세요.
 
-## JSON 응답 형식
+## 응답 형식
+반드시 아래 JSON 형식으로만 응답하세요.
 {
-  "title": "프로젝트 제안서 제목",
+  "title": "프로젝트 제안서 제목 (회사명 포함)",
   "sections": [
-    {
-      "id": "analysis",
-      "title": "프로젝트 이해 및 분석",
-      "content": "프로젝트 배경, 목표, 해결할 문제점, 솔루션 방향을 서술"
-    },
-    {
-      "id": "strategy",
-      "title": "제안 전략 및 로드맵",
-      "content": "MVP 범위 정의, 단계별 개발 로드맵, 차별화 포인트를 서술"
-    },
-    {
-      "id": "scope",
-      "title": "상세 개발 범위 및 기술 스택",
-      "content": "기능별 상세 명세, 추천 기술 스택과 선정 이유, 아키텍처 개요를 서술"
-    },
-    {
-      "id": "schedule",
-      "title": "프로젝트 일정 및 관리 방안",
-      "content": "단계별 일정(기획-디자인-개발-QA-배포), 커뮤니케이션 방법, 위험 관리를 서술"
-    },
-    {
-      "id": "budget",
-      "title": "견적 및 예산",
-      "content": "예산 범위 내 비용 산정 근거, 대금 결제 조건, 예산 옵션을 서술"
-    },
-    {
-      "id": "team",
-      "title": "팀 역량 및 지원",
-      "content": "Studio HaeTae의 강점, 유지보수 계획, 사후 지원 방안을 서술"
-    }
+    { "id": "analysis", "title": "프로젝트 이해 및 분석", "content": "..." },
+    { "id": "strategy", "title": "제안 전략 및 로드맵", "content": "..." },
+    { "id": "scope", "title": "상세 개발 범위 및 기술 스택", "content": "..." },
+    { "id": "schedule", "title": "프로젝트 일정 및 관리 방안", "content": "..." },
+    { "id": "budget", "title": "견적 및 예산", "content": "..." },
+    { "id": "team", "title": "팀 역량 및 지원", "content": "..." }
   ]
 }`;
 
     const response = await client.chat.complete({
       model: "mistral-large-latest",
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
       responseFormat: { type: "json_object" },
     });
 
@@ -124,16 +116,17 @@ ${project.message ? `- 추가 요청: ${project.message}` : ""}
       }
     }
 
-    // Save to database
-    const { error: updateError } = await supabase
+    // Save proposal + advance step
+    const updateData: Record<string, unknown> = { proposal };
+    if (project.step < 1) {
+      updateData.step = 1;
+    }
+
+    await supabase
       .from("projects")
-      .update({ proposal })
+      .update(updateData)
       .eq("id", id)
       .eq("user_id", user.id);
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
-    }
 
     return NextResponse.json({ success: true, proposal });
   } catch (error) {
