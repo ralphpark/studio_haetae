@@ -162,15 +162,17 @@ export function ProposalView({
         {proposal ? (
           <div className="flex flex-col gap-6" key="proposal">
             <ProposalSections proposal={proposal} />
-            <div className="flex justify-center">
-              <button
-                onClick={generate}
-                disabled={isGenerating}
-                className="px-6 py-2 text-sm text-white/40 hover:text-white/60 transition-colors disabled:opacity-30"
-              >
-                {isGenerating ? "확인 중..." : "제안서 다시 확인하기"}
-              </button>
-            </div>
+            {error && (
+              <div className="flex justify-center">
+                <button
+                  onClick={generate}
+                  disabled={isGenerating}
+                  className="px-6 py-2 text-sm text-white/40 hover:text-white/60 transition-colors disabled:opacity-30"
+                >
+                  {isGenerating ? "확인 중..." : "다시 확인하기"}
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <motion.div
