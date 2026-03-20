@@ -10,6 +10,13 @@ function getDatabaseId() {
   return process.env.NOTION_PROJECTS_DB_ID || "";
 }
 
+function ensureString(val: unknown): string {
+  if (typeof val === "string") return val;
+  if (val === null || val === undefined) return "";
+  if (typeof val === "object") return JSON.stringify(val, null, 2);
+  return String(val);
+}
+
 interface ProjectData {
   company: string;
   projectNumber: number;
@@ -28,7 +35,7 @@ interface ProjectData {
 }
 
 /**
- * Step 0: 프로젝트 생성 시 Notion 페이지 자동 생성
+ * Step 0: 프로젝트 생성 시 Notion 페이지 자동 생성 (상담 정보만)
  */
 export async function createNotionProjectPage(data: ProjectData): Promise<string | null> {
   const notion = getNotionClient();
@@ -49,7 +56,7 @@ export async function createNotionProjectPage(data: ProjectData): Promise<string
         {
           object: "block",
           type: "heading_2",
-          heading_2: { rich_text: [{ text: { content: "상담 정보" } }] },
+          heading_2: { rich_text: [{ text: { content: "📋 상담 정보" } }] },
         },
         {
           object: "block",
@@ -77,34 +84,12 @@ export async function createNotionProjectPage(data: ProjectData): Promise<string
         {
           object: "block",
           type: "heading_2",
-          heading_2: { rich_text: [{ text: { content: "AI 제안서" } }] },
+          heading_2: { rich_text: [{ text: { content: "📄 문서" } }] },
         },
         {
           object: "block",
           type: "paragraph",
-          paragraph: { rich_text: [{ text: { content: "(제안서 생성 시 자동으로 기록됩니다)" } }] },
-        },
-        { object: "block", type: "divider", divider: {} },
-        {
-          object: "block",
-          type: "heading_2",
-          heading_2: { rich_text: [{ text: { content: "상세 기획서" } }] },
-        },
-        {
-          object: "block",
-          type: "paragraph",
-          paragraph: { rich_text: [{ text: { content: "" } }] },
-        },
-        { object: "block", type: "divider", divider: {} },
-        {
-          object: "block",
-          type: "heading_2",
-          heading_2: { rich_text: [{ text: { content: "견적서" } }] },
-        },
-        {
-          object: "block",
-          type: "paragraph",
-          paragraph: { rich_text: [{ text: { content: "" } }] },
+          paragraph: { rich_text: [{ text: { content: "제안서 생성 시 하위 페이지로 자동 생성됩니다." } }] },
         },
       ],
     });
@@ -117,7 +102,7 @@ export async function createNotionProjectPage(data: ProjectData): Promise<string
 }
 
 /**
- * Step 1: AI 제안서를 Notion 페이지에 기록
+ * Step 1: AI 제안서를 별도 하위 페이지로 생성
  */
 export async function appendProposalToNotion(
   notionPageId: string,
@@ -127,78 +112,47 @@ export async function appendProposalToNotion(
   if (!notion || !notionPageId) return false;
 
   try {
-    // Find "AI 제안서" heading block ID and placeholder to delete
-    const blocks = await notion.blocks.children.list({ block_id: notionPageId });
-    let headingBlockId: string | null = null;
-    let placeholderBlockId: string | null = null;
-    let foundHeading = false;
-
-    for (const block of blocks.results) {
-      if (
-        "type" in block &&
-        block.type === "heading_2" &&
-        "heading_2" in block
-      ) {
-        const heading = block.heading_2 as { rich_text: Array<{ plain_text: string }> };
-        if (heading.rich_text?.[0]?.plain_text === "AI 제안서") {
-          headingBlockId = block.id;
-          foundHeading = true;
-          continue;
-        }
-      }
-      if (foundHeading && "type" in block && block.type === "paragraph") {
-        const para = block.paragraph as { rich_text: Array<{ plain_text: string }> };
-        if (para.rich_text?.[0]?.plain_text?.includes("제안서 생성 시")) {
-          placeholderBlockId = block.id;
-        }
-        break;
-      }
-      if (foundHeading && "type" in block && block.type !== "paragraph") break;
-    }
-
-    // Delete placeholder
-    if (placeholderBlockId) {
-      await notion.blocks.delete({ block_id: placeholderBlockId });
-    }
-
-    if (!headingBlockId) return false;
-
-    // Build proposal content blocks
-    const children: Parameters<typeof notion.blocks.children.append>[0]["children"] = [];
+    // 제안서 하위 페이지 생성
+    const children: Parameters<typeof notion.pages.create>[0]["children"] = [];
 
     for (const section of proposal.sections) {
       children.push(
         {
           object: "block",
-          type: "heading_3",
-          heading_3: { rich_text: [{ text: { content: section.title } }] },
+          type: "heading_2",
+          heading_2: { rich_text: [{ text: { content: ensureString(section.title) } }] },
         },
         {
           object: "block",
           type: "paragraph",
           paragraph: {
-            rich_text: [{ text: { content: section.content.slice(0, 2000) } }],
+            rich_text: [{ text: { content: ensureString(section.content).slice(0, 2000) } }],
           },
-        }
+        },
+        { object: "block", type: "divider", divider: {} }
       );
     }
 
-    // Append right after the "AI 제안서" heading using `after` parameter
-    await notion.blocks.children.append({
-      block_id: notionPageId,
+    await notion.pages.create({
+      parent: { page_id: notionPageId },
+      icon: { type: "emoji", emoji: "📑" },
+      properties: {
+        title: {
+          title: [{ text: { content: `제안서 - ${ensureString(proposal.title)}` } }],
+        },
+      },
       children,
-      after: headingBlockId,
     });
 
     return true;
   } catch (error) {
-    console.error("[NOTION] Append proposal error:", error);
+    console.error("[NOTION] Create proposal page error:", error);
     return false;
   }
 }
 
 /**
- * Step 3: n8n에서 생성된 기획서/견적서를 Notion 페이지에 기록
+ * Step 2: 기획서/견적서를 각각 별도 하위 페이지로 생성
  */
 export async function appendDocumentsToNotion(
   notionPageId: string,
@@ -211,154 +165,98 @@ export async function appendDocumentsToNotion(
   if (!notion || !notionPageId) return false;
 
   try {
-    const blocks = await notion.blocks.children.list({ block_id: notionPageId });
+    // 상세 기획서 하위 페이지 생성
+    if (docs.planningDoc) {
+      const planningChildren: Parameters<typeof notion.pages.create>[0]["children"] = [];
 
-    // Find "상세 기획서" heading and its placeholder
-    let planningHeadingId: string | null = null;
-    let planningPlaceholderId: string | null = null;
-    let estimateHeadingId: string | null = null;
-    let estimatePlaceholderId: string | null = null;
-    let currentTarget: "planning" | "estimate" | null = null;
-
-    for (const block of blocks.results) {
-      if ("type" in block && block.type === "heading_2" && "heading_2" in block) {
-        const heading = block.heading_2 as { rich_text: Array<{ plain_text: string }> };
-        const text = heading.rich_text?.[0]?.plain_text || "";
-
-        if (text === "상세 기획서") {
-          planningHeadingId = block.id;
-          currentTarget = "planning";
-          continue;
-        }
-        if (text === "견적서") {
-          estimateHeadingId = block.id;
-          currentTarget = "estimate";
-          continue;
-        }
-        currentTarget = null;
-      }
-
-      if (currentTarget && "type" in block && block.type === "paragraph") {
-        const para = block.paragraph as { rich_text: Array<{ plain_text: string }> };
-        const text = para.rich_text?.[0]?.plain_text || "";
-        if (text === "" || text.trim() === "") {
-          if (currentTarget === "planning" && !planningPlaceholderId) {
-            planningPlaceholderId = block.id;
-          } else if (currentTarget === "estimate" && !estimatePlaceholderId) {
-            estimatePlaceholderId = block.id;
-          }
-        }
-        currentTarget = null;
-      }
-    }
-
-    // Placeholder 삭제
-    if (planningPlaceholderId) {
-      await notion.blocks.delete({ block_id: planningPlaceholderId }).catch(() => {});
-    }
-    if (estimatePlaceholderId) {
-      await notion.blocks.delete({ block_id: estimatePlaceholderId }).catch(() => {});
-    }
-
-    // 기획서 블록 생성
-    if (docs.planningDoc && planningHeadingId) {
-      const children: Parameters<typeof notion.blocks.children.append>[0]["children"] = [];
       for (const section of docs.planningDoc.sections) {
-        const title = typeof section.title === "string" ? section.title : JSON.stringify(section.title || "");
-        const content = typeof section.content === "string" ? section.content : JSON.stringify(section.content || "", null, 2);
-        children.push(
+        planningChildren.push(
           {
             object: "block",
-            type: "heading_3",
-            heading_3: { rich_text: [{ text: { content: title } }] },
+            type: "heading_2",
+            heading_2: { rich_text: [{ text: { content: ensureString(section.title) } }] },
           },
           {
             object: "block",
             type: "paragraph",
             paragraph: {
-              rich_text: [{ text: { content: content.slice(0, 2000) } }],
+              rich_text: [{ text: { content: ensureString(section.content).slice(0, 2000) } }],
             },
-          }
+          },
+          { object: "block", type: "divider", divider: {} }
         );
       }
 
-      await notion.blocks.children.append({
-        block_id: notionPageId,
-        children,
-        after: planningHeadingId,
+      await notion.pages.create({
+        parent: { page_id: notionPageId },
+        icon: { type: "emoji", emoji: "📘" },
+        properties: {
+          title: {
+            title: [{ text: { content: `상세 기획서 - ${ensureString(docs.planningDoc.title)}` } }],
+          },
+        },
+        children: planningChildren,
       });
     }
 
-    // 견적서 블록 생성 - 헤딩을 다시 찾아야 함 (기획서 추가로 블록 순서 변경됨)
+    // 견적서 하위 페이지 생성
     if (docs.estimate) {
-      // 블록 목록 다시 조회
-      const refreshedBlocks = await notion.blocks.children.list({ block_id: notionPageId });
-      let freshEstimateHeadingId: string | null = null;
-
-      for (const block of refreshedBlocks.results) {
-        if ("type" in block && block.type === "heading_2" && "heading_2" in block) {
-          const heading = block.heading_2 as { rich_text: Array<{ plain_text: string }> };
-          if (heading.rich_text?.[0]?.plain_text === "견적서") {
-            freshEstimateHeadingId = block.id;
-            break;
-          }
-        }
-      }
-
-      if (freshEstimateHeadingId) {
-        const estimateChildren: Parameters<typeof notion.blocks.children.append>[0]["children"] = [
-          {
-            object: "block",
-            type: "table",
-            table: {
-              table_width: 3,
-              has_column_header: true,
-              children: [
-                {
-                  object: "block",
-                  type: "table_row",
-                  table_row: {
-                    cells: [
-                      [{ text: { content: "항목" } }],
-                      [{ text: { content: "비용" } }],
-                      [{ text: { content: "비고" } }],
-                    ],
-                  },
+      const estimateChildren: Parameters<typeof notion.pages.create>[0]["children"] = [
+        {
+          object: "block",
+          type: "table",
+          table: {
+            table_width: 3,
+            has_column_header: true,
+            children: [
+              {
+                object: "block",
+                type: "table_row",
+                table_row: {
+                  cells: [
+                    [{ text: { content: "항목" } }],
+                    [{ text: { content: "비용" } }],
+                    [{ text: { content: "비고" } }],
+                  ],
                 },
-                ...docs.estimate.items.map((item) => ({
-                  object: "block" as const,
-                  type: "table_row" as const,
-                  table_row: {
-                    cells: [
-                      [{ text: { content: typeof item.name === "string" ? item.name : String(item.name) } }],
-                      [{ text: { content: typeof item.price === "string" ? item.price : String(item.price) } }],
-                      [{ text: { content: typeof item.note === "string" ? item.note : String(item.note) } }],
-                    ],
-                  },
-                })),
-              ],
-            },
+              },
+              ...docs.estimate.items.map((item) => ({
+                object: "block" as const,
+                type: "table_row" as const,
+                table_row: {
+                  cells: [
+                    [{ text: { content: ensureString(item.name) } }],
+                    [{ text: { content: ensureString(item.price) } }],
+                    [{ text: { content: ensureString(item.note) } }],
+                  ],
+                },
+              })),
+            ],
           },
-          {
-            object: "block",
-            type: "paragraph",
-            paragraph: {
-              rich_text: [{ text: { content: `합계: ${typeof docs.estimate.total === "string" ? docs.estimate.total : String(docs.estimate.total)}` } }],
-            },
-          },
-        ];
+        },
+        { object: "block", type: "divider", divider: {} },
+        {
+          object: "block",
+          type: "heading_3",
+          heading_3: { rich_text: [{ text: { content: `합계: ${ensureString(docs.estimate.total)}` } }] },
+        },
+      ];
 
-        await notion.blocks.children.append({
-          block_id: notionPageId,
-          children: estimateChildren,
-          after: freshEstimateHeadingId,
-        });
-      }
+      await notion.pages.create({
+        parent: { page_id: notionPageId },
+        icon: { type: "emoji", emoji: "💰" },
+        properties: {
+          title: {
+            title: [{ text: { content: `견적서 - ${ensureString(docs.estimate.title)}` } }],
+          },
+        },
+        children: estimateChildren,
+      });
     }
 
     return true;
   } catch (error) {
-    console.error("[NOTION] Append documents error:", error);
+    console.error("[NOTION] Create document pages error:", error);
     return false;
   }
 }
