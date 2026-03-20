@@ -131,9 +131,11 @@ ${project.message ? `- 추가 요청: ${project.message}` : ""}
 
     // Append proposal to Notion page
     if (project.notion_page_id) {
-      appendProposalToNotion(project.notion_page_id, proposal).catch((err) =>
-        console.error("[NOTION] Background append error:", err)
-      );
+      try {
+        await appendProposalToNotion(project.notion_page_id, proposal);
+      } catch (err) {
+        console.error("[NOTION] Append error:", err);
+      }
     }
 
     return NextResponse.json({ success: true, proposal });
