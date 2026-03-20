@@ -47,7 +47,8 @@ export function ProposalModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm overflow-y-auto overscroll-contain"
+      style={{ WebkitOverflowScrolling: "touch" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -56,7 +57,7 @@ export function ProposalModal({
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 40 }}
-        className="w-full max-w-3xl mx-4 my-12 flex flex-col gap-4"
+        className="w-full max-w-3xl mx-4 my-12 flex flex-col gap-4 pb-8"
       >
         {/* Header */}
         <div className="bg-[#0f1211] border border-white/10 rounded-2xl p-8 text-center relative">
