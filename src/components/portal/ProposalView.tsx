@@ -48,9 +48,7 @@ function ProposalSections({ proposal }: { proposal: Proposal }) {
           Project Proposal
         </p>
         <h2 className="text-2xl sm:text-3xl font-bold">{proposal.title}</h2>
-        <p className="text-white/40 text-sm mt-2">
-          Powered by AI · Studio HaeTae
-        </p>
+        <p className="text-white/40 text-sm mt-2">Studio HaeTae</p>
       </div>
 
       {/* Sections */}
@@ -170,7 +168,7 @@ export function ProposalView({
                 disabled={isGenerating}
                 className="px-6 py-2 text-sm text-white/40 hover:text-white/60 transition-colors disabled:opacity-30"
               >
-                {isGenerating ? "재생성 중..." : "기획서 다시 생성하기"}
+                {isGenerating ? "확인 중..." : "제안서 다시 확인하기"}
               </button>
             </div>
           </div>
@@ -192,52 +190,27 @@ export function ProposalView({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={1.5}
-                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
             </div>
             <h3 className="text-lg font-semibold mb-2">
-              AI 기획서를 생성해보세요
+              제안서가 준비되었습니다
             </h3>
             <p className="text-white/50 text-sm max-w-sm mb-6">
-              상담 내용을 기반으로 프로젝트 제안서를 자동으로 작성합니다.
-              <br />
-              분석, 전략, 기술 스택, 일정, 견적까지 한번에.
+              상담 내용을 기반으로 Studio HaeTae의 제안서를 확인해보세요.
             </p>
             {error && (
-              <p className="text-red-400 text-sm mb-4">{error}</p>
+              <p className="text-white/50 text-sm mb-4">
+                잠시 후 다시 확인해주세요.
+              </p>
             )}
             <button
               onClick={generate}
               disabled={isGenerating}
               className="px-8 py-3 bg-white text-black rounded-full font-semibold hover:bg-white/90 active:scale-95 transition-all disabled:opacity-50"
             >
-              {isGenerating ? (
-                <span className="flex items-center gap-2">
-                  <svg
-                    className="animate-spin w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                    />
-                  </svg>
-                  기획서 생성 중...
-                </span>
-              ) : (
-                "AI 기획서 생성하기"
-              )}
+              {isGenerating ? "확인 중..." : "제안서 확인하기"}
             </button>
           </motion.div>
         )}
