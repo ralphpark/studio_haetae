@@ -252,12 +252,16 @@ export async function appendDocumentsToNotion(
       }
     }
 
-    // Append 상세 기획서
-    if (docs.planningDoc && planningHeadingId) {
-      if (planningPlaceholderId) {
-        await notion.blocks.delete({ block_id: planningPlaceholderId });
-      }
+    // Placeholder 삭제
+    if (planningPlaceholderId) {
+      await notion.blocks.delete({ block_id: planningPlaceholderId }).catch(() => {});
+    }
+    if (estimatePlaceholderId) {
+      await notion.blocks.delete({ block_id: estimatePlaceholderId }).catch(() => {});
+    }
 
+    // 기획서 블록 생성
+    if (docs.planningDoc && planningHeadingId) {
       const children: Parameters<typeof notion.blocks.children.append>[0]["children"] = [];
       for (const section of docs.planningDoc.sections) {
         const title = typeof section.title === "string" ? section.title : JSON.stringify(section.title || "");
@@ -285,61 +289,71 @@ export async function appendDocumentsToNotion(
       });
     }
 
-    // Append 견적서
-    if (docs.estimate && estimateHeadingId) {
-      if (estimatePlaceholderId) {
-        await notion.blocks.delete({ block_id: estimatePlaceholderId });
+    // 견적서 블록 생성 - 헤딩을 다시 찾아야 함 (기획서 추가로 블록 순서 변경됨)
+    if (docs.estimate) {
+      // 블록 목록 다시 조회
+      const refreshedBlocks = await notion.blocks.children.list({ block_id: notionPageId });
+      let freshEstimateHeadingId: string | null = null;
+
+      for (const block of refreshedBlocks.results) {
+        if ("type" in block && block.type === "heading_2" && "heading_2" in block) {
+          const heading = block.heading_2 as { rich_text: Array<{ plain_text: string }> };
+          if (heading.rich_text?.[0]?.plain_text === "견적서") {
+            freshEstimateHeadingId = block.id;
+            break;
+          }
+        }
       }
 
-      const estimateChildren: Parameters<typeof notion.blocks.children.append>[0]["children"] = [
-        {
-          object: "block",
-          type: "table",
-          table: {
-            table_width: 3,
-            has_column_header: true,
-            children: [
-              {
-                object: "block",
-                type: "table_row",
-                table_row: {
-                  cells: [
-                    [{ text: { content: "항목" } }],
-                    [{ text: { content: "비용" } }],
-                    [{ text: { content: "비고" } }],
-                  ],
+      if (freshEstimateHeadingId) {
+        const estimateChildren: Parameters<typeof notion.blocks.children.append>[0]["children"] = [
+          {
+            object: "block",
+            type: "table",
+            table: {
+              table_width: 3,
+              has_column_header: true,
+              children: [
+                {
+                  object: "block",
+                  type: "table_row",
+                  table_row: {
+                    cells: [
+                      [{ text: { content: "항목" } }],
+                      [{ text: { content: "비용" } }],
+                      [{ text: { content: "비고" } }],
+                    ],
+                  },
                 },
-              },
-              ...docs.estimate.items.map((item) => ({
-                object: "block" as const,
-                type: "table_row" as const,
-                table_row: {
-                  cells: [
-                    [{ text: { content: item.name } }],
-                    [{ text: { content: item.price } }],
-                    [{ text: { content: item.note } }],
-                  ],
-                },
-              })),
-            ],
+                ...docs.estimate.items.map((item) => ({
+                  object: "block" as const,
+                  type: "table_row" as const,
+                  table_row: {
+                    cells: [
+                      [{ text: { content: typeof item.name === "string" ? item.name : String(item.name) } }],
+                      [{ text: { content: typeof item.price === "string" ? item.price : String(item.price) } }],
+                      [{ text: { content: typeof item.note === "string" ? item.note : String(item.note) } }],
+                    ],
+                  },
+                })),
+              ],
+            },
           },
-        },
-        {
-          object: "block",
-          type: "paragraph",
-          paragraph: {
-            rich_text: [
-              { text: { content: `합계: ${docs.estimate.total}`, annotations: { bold: true } } as never },
-            ],
+          {
+            object: "block",
+            type: "paragraph",
+            paragraph: {
+              rich_text: [{ text: { content: `합계: ${typeof docs.estimate.total === "string" ? docs.estimate.total : String(docs.estimate.total)}` } }],
+            },
           },
-        },
-      ];
+        ];
 
-      await notion.blocks.children.append({
-        block_id: notionPageId,
-        children: estimateChildren,
-        after: estimateHeadingId,
-      });
+        await notion.blocks.children.append({
+          block_id: notionPageId,
+          children: estimateChildren,
+          after: freshEstimateHeadingId,
+        });
+      }
     }
 
     return true;
