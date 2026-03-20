@@ -41,13 +41,9 @@ export async function createNotionProjectPage(data: ProjectData): Promise<string
     const page = await notion.pages.create({
       parent: { database_id: getDatabaseId() },
       properties: {
-        Name: {
+        "이름": {
           title: [{ text: { content: `${data.company} - 프로젝트 ${data.projectNumber}` } }],
         },
-        Company: { rich_text: [{ text: { content: data.company } }] },
-        Email: { email: data.clientEmail },
-        Budget: { select: { name: data.budget } },
-        Status: { select: { name: "상담 접수" } },
       },
       children: [
         {
