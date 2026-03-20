@@ -336,26 +336,12 @@ export function ProposalView({
       setProposal(newProposal);
       if (currentStep < 1) setCurrentStep(1);
       setShowModal(true);
-
-      // 백그라운드: 기획서/견적서 자동 생성
-      generateDocs();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "잠시 후 다시 확인해주세요."
       );
     } finally {
       setIsGenerating(false);
-    }
-  };
-
-  const generateDocs = async () => {
-    try {
-      await fetch(`/api/projects/${projectId}/generate-docs`, {
-        method: "POST",
-      });
-      // 결과는 Notion에 기록됨. 포털에는 Notion 수정 완료 후 표시.
-    } catch (err) {
-      console.error("Generate docs error:", err);
     }
   };
 
