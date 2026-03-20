@@ -336,6 +336,10 @@ export function ProposalView({
       setProposal(newProposal);
       if (currentStep < 1) setCurrentStep(1);
       setShowModal(true);
+
+      // 제안서 모달 표시 후, 기획서/견적서 백그라운드 생성 (별도 API)
+      fetch(`/api/projects/${projectId}/generate-docs`, { method: "POST" })
+        .catch((err) => console.error("Generate docs error:", err));
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "잠시 후 다시 확인해주세요."

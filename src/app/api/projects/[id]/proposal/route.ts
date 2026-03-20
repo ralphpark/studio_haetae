@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { Mistral } from "@mistralai/mistralai";
-import { appendProposalToNotion, appendDocumentsToNotion } from "@/utils/notion";
-
-export const maxDuration = 60;
+import { appendProposalToNotion } from "@/utils/notion";
 
 const SYSTEM_PROMPT = `당신은 'Studio HaeTae'의 시니어 프로젝트 매니저입니다.
 12년간 100개 이상의 외주 프로젝트를 성공적으로 납품한 경험이 있습니다.
@@ -16,24 +14,6 @@ const SYSTEM_PROMPT = `당신은 'Studio HaeTae'의 시니어 프로젝트 매�
 - 예산 범위에 맞는 현실적인 제안을 합니다
 - 항상 한국어로 응답합니다
 - 반드시 요청된 JSON 형식으로만 응답합니다`;
-
-const PLANNING_SYSTEM = `당신은 Studio HaeTae의 시니어 프로젝트 매니저입니다.
-12년간 100개 이상의 외주 프로젝트를 성공적으로 납품한 경험이 있습니다.
-상세 기획서를 작성합니다. 반드시 한국어, JSON 형식으로만 응답하세요.`;
-
-const ESTIMATE_SYSTEM = `당신은 Studio HaeTae의 비즈니스 매니저입니다.
-투명하고 합리적인 견적서를 작성합니다. 반드시 한국어, JSON 형식으로만 응답하세요.`;
-
-function parseAIJson(text: unknown) {
-  const str = typeof text === "string" ? text : "";
-  try {
-    return JSON.parse(str);
-  } catch {
-    const match = str.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]);
-    return null;
-  }
-}
 
 export async function POST(
   _req: Request,
@@ -74,12 +54,7 @@ export async function POST(
       ? project.features.join(", ")
       : project.features || "";
 
-    // ===== 1. 제안서 생성 =====
-    const proposalRes = await client.chat.complete({
-      model: "mistral-large-latest",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: `아래 상담 데이터를 기반으로 프로젝트 제안서를 작성해주세요.
+    const userPrompt = `아래 상담 데이터를 기반으로 프로젝트 제안서를 작성해주세요.
 
 ## 상담 데이터
 - 회사명: ${project.company}
@@ -106,128 +81,52 @@ ${project.message ? `- 추가 요청: ${project.message}` : ""}
     { "id": "budget", "title": "견적 및 예산", "content": "..." },
     { "id": "team", "title": "팀 역량 및 지원", "content": "..." }
   ]
-}` },
+}`;
+
+    const response = await client.chat.complete({
+      model: "mistral-large-latest",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
       ],
       responseFormat: { type: "json_object" },
     });
 
-    const proposal = parseAIJson(proposalRes.choices?.[0]?.message?.content);
-    if (!proposal) {
-      return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 });
+    const text = response.choices?.[0]?.message?.content || "";
+
+    let proposal;
+    try {
+      proposal = JSON.parse(typeof text === "string" ? text : "");
+    } catch {
+      const jsonMatch = typeof text === "string" ? text.match(/\{[\s\S]*\}/) : null;
+      if (jsonMatch) {
+        proposal = JSON.parse(jsonMatch[0]);
+      } else {
+        return NextResponse.json(
+          { error: "Failed to parse AI response" },
+          { status: 500 }
+        );
+      }
     }
 
-    // 제안서 저장
+    // Save proposal + advance step
+    const updateData: Record<string, unknown> = { proposal };
+    if (project.step < 1) {
+      updateData.step = 1;
+    }
+
     await supabase
       .from("projects")
-      .update({ proposal, step: 1 })
+      .update(updateData)
       .eq("id", id)
       .eq("user_id", user.id);
 
-    // 제안서 Notion 기록
+    // Append proposal to Notion page
     if (project.notion_page_id) {
       try {
         await appendProposalToNotion(project.notion_page_id, proposal);
       } catch (err) {
-        console.error("[NOTION] Proposal append error:", err);
-      }
-    }
-
-    // ===== 2. 기획서 생성 =====
-    const proposalSummary = Array.isArray(proposal.sections)
-      ? proposal.sections.map((s: { title: string; content: string }) =>
-          `${String(s.title || "")}: ${String(s.content || "").substring(0, 200)}`
-        ).join("\n")
-      : "";
-
-    const planningRes = await client.chat.complete({
-      model: "mistral-large-latest",
-      messages: [
-        { role: "system", content: PLANNING_SYSTEM },
-        { role: "user", content: `상세 기획서를 작성해주세요.
-
-## 프로젝트 정보
-- 회사명: ${project.company}
-- 유형: ${project.project_type}
-- 목적: ${project.project_purpose}
-- 타겟: ${project.target_user}
-- 기능: ${features}
-- 디자인: ${project.design_status}
-- 예산: ${project.budget}
-- 일정: ${project.timeline}
-- 유지보수: ${project.maintenance}
-
-## 제안서 요약
-${proposalSummary}
-
-## 응답 형식
-{
-  "title": "상세 기획서 제목",
-  "sections": [
-    { "title": "기능 명세", "content": "각 기능별 상세 요구사항, 화면 구성, 데이터 흐름" },
-    { "title": "기술 아키텍처", "content": "시스템 구조, 기술 스택, API 설계" },
-    { "title": "데이터베이스 설계", "content": "엔티티, 관계, 스키마" },
-    { "title": "UI/UX 설계 방향", "content": "화면 리스트, 플로우, 반응형" },
-    { "title": "개발 일정", "content": "마일스톤별 세부 일정" },
-    { "title": "테스트 및 QA", "content": "테스트 범위, 방법론" }
-  ]
-}` },
-      ],
-      responseFormat: { type: "json_object" },
-    });
-
-    const planningDoc = parseAIJson(planningRes.choices?.[0]?.message?.content);
-
-    // ===== 3. 견적서 생성 =====
-    const estimateRes = await client.chat.complete({
-      model: "mistral-large-latest",
-      messages: [
-        { role: "system", content: ESTIMATE_SYSTEM },
-        { role: "user", content: `견적서를 작성해주세요.
-
-## 프로젝트 정보
-- 회사명: ${project.company}
-- 유형: ${project.project_type}
-- 기능: ${features}
-- 디자인: ${project.design_status}
-- 예산: ${project.budget}
-- 일정: ${project.timeline}
-- 유지보수: ${project.maintenance}
-
-## 응답 형식
-{
-  "title": "${project.company} 프로젝트 견적서",
-  "items": [
-    { "name": "항목명", "price": "금액", "note": "비고" }
-  ],
-  "total": "총 견적 금액"
-}` },
-      ],
-      responseFormat: { type: "json_object" },
-    });
-
-    const estimate = parseAIJson(estimateRes.choices?.[0]?.message?.content);
-
-    // 기획서/견적서 Supabase 저장
-    await supabase
-      .from("projects")
-      .update({
-        planning_doc: planningDoc,
-        estimate: estimate,
-        step: 2,
-        status: "기획서 초안 생성 완료",
-      })
-      .eq("id", id)
-      .eq("user_id", user.id);
-
-    // 기획서/견적서 Notion 기록
-    if (project.notion_page_id && (planningDoc || estimate)) {
-      try {
-        await appendDocumentsToNotion(project.notion_page_id, {
-          planningDoc,
-          estimate,
-        });
-      } catch (err) {
-        console.error("[NOTION] Docs append error:", err);
+        console.error("[NOTION] Append error:", err);
       }
     }
 
