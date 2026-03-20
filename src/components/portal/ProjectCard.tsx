@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface Project {
   id: string;
@@ -29,24 +30,26 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function ProjectCard({ project }: { project: Project }) {
+  const router = useRouter();
   const defaultName = `프로젝트 ${project.project_number}`;
   const [name, setName] = useState(project.project_name || defaultName);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isDeleted, setIsDeleted] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleDelete = async () => {
+    setIsDeleting(true);
     try {
       const res = await fetch(`/api/projects/${project.id}`, { method: "DELETE" });
-      if (res.ok) setIsDeleted(true);
+      if (res.ok) {
+        router.refresh();
+      }
     } catch {
-      // ignore
+      setIsDeleting(false);
     }
   };
-
-  if (isDeleted) return null;
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -145,9 +148,10 @@ export function ProjectCard({ project }: { project: Project }) {
               <span className="text-white/40 text-xs">삭제하시겠습니까?</span>
               <button
                 onClick={handleDelete}
-                className="text-red-400 text-xs hover:text-red-300 font-medium"
+                disabled={isDeleting}
+                className="text-red-400 text-xs hover:text-red-300 font-medium disabled:opacity-50"
               >
-                삭제
+                {isDeleting ? "삭제 중..." : "삭제"}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(false)}
