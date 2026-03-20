@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { Mistral } from "@mistralai/mistralai";
 
 export async function POST(
   _req: Request,
@@ -28,15 +28,15 @@ export async function POST(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.MISTRAL_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "AI API key not configured" },
+        { error: "AI API key not configured. Set MISTRAL_API_KEY in environment variables." },
         { status: 500 }
       );
     }
 
-    const client = new Anthropic({ apiKey });
+    const client = new Mistral({ apiKey });
 
     const features = Array.isArray(project.features)
       ? project.features.join(", ")
@@ -62,6 +62,7 @@ ${project.message ? `- 추가 요청: ${project.message}` : ""}
 2. 각 섹션의 content는 전문적이면서도 클라이언트가 이해하기 쉬운 언어로 작성하세요.
 3. 기술 용어는 꼭 필요한 경우에만 사용하고, 비유나 쉬운 설명을 함께 제공하세요.
 4. 구체적인 수치, 기간, 기능 목록을 포함하세요.
+5. 각 섹션의 content는 최소 200자 이상으로 충분히 상세하게 작성하세요.
 
 ## JSON 응답 형식
 {
@@ -100,21 +101,19 @@ ${project.message ? `- 추가 요청: ${project.message}` : ""}
   ]
 }`;
 
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4096,
+    const response = await client.chat.complete({
+      model: "mistral-large-latest",
       messages: [{ role: "user", content: prompt }],
+      responseFormat: { type: "json_object" },
     });
 
-    const text =
-      response.content[0].type === "text" ? response.content[0].text : "";
+    const text = response.choices?.[0]?.message?.content || "";
 
     let proposal;
     try {
-      proposal = JSON.parse(text);
+      proposal = JSON.parse(typeof text === "string" ? text : "");
     } catch {
-      // Try extracting JSON from response
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      const jsonMatch = typeof text === "string" ? text.match(/\{[\s\S]*\}/) : null;
       if (jsonMatch) {
         proposal = JSON.parse(jsonMatch[0]);
       } else {
