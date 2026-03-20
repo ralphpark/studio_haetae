@@ -57,9 +57,11 @@ export async function POST(
 
     const client = new Mistral({ apiKey });
     const features = Array.isArray(project.features) ? project.features.join(", ") : "";
-    const proposalSummary = project.proposal.sections
-      ?.map((s: { title: string; content: string }) => `${s.title}: ${String(s.content || "").substring(0, 200)}`)
-      .join("\n") || "";
+    const proposalSummary = Array.isArray(project.proposal.sections)
+      ? project.proposal.sections
+          .map((s: { title: string; content: string }) => `${String(s.title || "")}: ${String(s.content || "").substring(0, 200)}`)
+          .join("\n")
+      : "";
 
     // 1. 기획서 생성
     const planningRes = await client.chat.complete({

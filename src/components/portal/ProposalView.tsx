@@ -307,10 +307,7 @@ export function ProposalView({
 }) {
   const [proposal, setProposal] = useState<Proposal | null>(initialProposal);
   const [currentStep, setCurrentStep] = useState(step);
-  const [currentPlanningDoc, setCurrentPlanningDoc] = useState<PlanningDoc | null>(planningDoc || null);
-  const [currentEstimate, setCurrentEstimate] = useState<Estimate | null>(estimate || null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isGeneratingDocs, setIsGeneratingDocs] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState("");
 
@@ -352,21 +349,13 @@ export function ProposalView({
   };
 
   const generateDocs = async () => {
-    setIsGeneratingDocs(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/generate-docs`, {
+      await fetch(`/api/projects/${projectId}/generate-docs`, {
         method: "POST",
       });
-      if (res.ok) {
-        const { planningDoc: newPlanningDoc, estimate: newEstimate } = await res.json();
-        setCurrentPlanningDoc(newPlanningDoc);
-        setCurrentEstimate(newEstimate);
-        if (currentStep < 2) setCurrentStep(2);
-      }
+      // 결과는 Notion에 기록됨. 포털에는 Notion 수정 완료 후 표시.
     } catch (err) {
       console.error("Generate docs error:", err);
-    } finally {
-      setIsGeneratingDocs(false);
     }
   };
 
@@ -419,14 +408,13 @@ export function ProposalView({
         </div>
       </motion.div>
 
-      {/* Step 2~3: 기획서/견적서 (제안서 생성 후 표시) */}
-      {currentStep >= 1 && (
+      {/* Step 3: 기획서/견적서 (Notion 수정 완료 후 표시) */}
+      {docsReady && (
         <DocumentCard
           documentUrls={documentUrls || null}
-          planningDoc={currentPlanningDoc}
-          estimate={currentEstimate}
+          planningDoc={planningDoc}
+          estimate={estimate}
           isConfirmed={docsReady}
-          isInProgress={docsInProgress || isGeneratingDocs}
         />
       )}
 

@@ -264,13 +264,13 @@ export async function appendDocumentsToNotion(
           {
             object: "block",
             type: "heading_3",
-            heading_3: { rich_text: [{ text: { content: section.title } }] },
+            heading_3: { rich_text: [{ text: { content: String(section.title || "") } }] },
           },
           {
             object: "block",
             type: "paragraph",
             paragraph: {
-              rich_text: [{ text: { content: section.content.slice(0, 2000) } }],
+              rich_text: [{ text: { content: String(section.content || "").slice(0, 2000) } }],
             },
           }
         );
