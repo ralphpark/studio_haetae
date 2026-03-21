@@ -3,7 +3,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createClient } from "@/utils/supabase/client";
+import { useRouter } from "next/navigation";
 
 interface NavbarProps {
   bgClass?: string;
@@ -19,6 +21,22 @@ const navLinks = [
 
 export function Navbar({ bgClass = "bg-[#070808]/95 backdrop-blur-md border-b border-[#E7E5DF]/10", positionClass = "relative z-[80]" }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const router = useRouter();
+  const supabase = createClient();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session);
+    });
+    return () => subscription.unsubscribe();
+  }, [supabase.auth]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setMobileOpen(false);
+    router.refresh();
+  };
 
   const handleNavClick = (href: string) => {
     setMobileOpen(false);
@@ -59,14 +77,31 @@ export function Navbar({ bgClass = "bg-[#070808]/95 backdrop-blur-md border-b bo
           ))}
         </nav>
 
-        {/* 3. Right: Login (Desktop) */}
-        <div className="pointer-events-auto hidden md:block mix-blend-difference">
-          <Link
-            href="/login"
-            className="font-mono text-sm tracking-widest text-[#E7E5DF] hover:text-accent transition-colors border-b border-[#E7E5DF] hover:border-accent pb-1"
-          >
-            LOGIN
-          </Link>
+        {/* 3. Right: Login/Logout (Desktop) */}
+        <div className="pointer-events-auto hidden md:flex items-center gap-4 mix-blend-difference">
+          {isLoggedIn ? (
+            <>
+              <Link
+                href="/portal"
+                className="font-mono text-sm tracking-widest text-[#E7E5DF] hover:text-accent transition-colors"
+              >
+                PORTAL
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="font-mono text-sm tracking-widest text-[#E7E5DF]/50 hover:text-accent transition-colors border-b border-[#E7E5DF]/30 hover:border-accent pb-1 cursor-pointer"
+              >
+                LOGOUT
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              className="font-mono text-sm tracking-widest text-[#E7E5DF] hover:text-accent transition-colors border-b border-[#E7E5DF] hover:border-accent pb-1"
+            >
+              LOGIN
+            </Link>
+          )}
         </div>
 
         {/* 4. Mobile Menu Toggle */}
@@ -110,15 +145,33 @@ export function Navbar({ bgClass = "bg-[#070808]/95 backdrop-blur-md border-b bo
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.4, delay: navLinks.length * 0.07 }}
-              className="mt-4 pt-8 border-t border-[#E7E5DF]/10"
+              className="mt-4 pt-8 border-t border-[#E7E5DF]/10 flex flex-col items-center gap-4"
             >
-              <Link
-                href="/login"
-                onClick={() => setMobileOpen(false)}
-                className="font-mono text-sm tracking-widest text-[#E7E5DF]/50 hover:text-accent transition-colors"
-              >
-                LOGIN →
-              </Link>
+              {isLoggedIn ? (
+                <>
+                  <Link
+                    href="/portal"
+                    onClick={() => setMobileOpen(false)}
+                    className="font-mono text-sm tracking-widest text-[#E7E5DF]/50 hover:text-accent transition-colors"
+                  >
+                    PORTAL →
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="font-mono text-sm tracking-widest text-[#E7E5DF]/30 hover:text-accent transition-colors cursor-pointer"
+                  >
+                    LOGOUT
+                  </button>
+                </>
+              ) : (
+                <Link
+                  href="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="font-mono text-sm tracking-widest text-[#E7E5DF]/50 hover:text-accent transition-colors"
+                >
+                  LOGIN →
+                </Link>
+              )}
             </motion.div>
 
             {/* Close button (top-right) */}
