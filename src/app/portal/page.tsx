@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "@/components/portal/LogoutButton";
@@ -57,7 +58,15 @@ export default async function PortalPage() {
             Welcome back, {userName}.
           </p>
         </div>
-        <LogoutButton />
+        <div className="flex items-center gap-4">
+          <Link
+            href="/"
+            className="font-mono text-xs tracking-widest uppercase px-4 py-2 border border-white/10 rounded-full text-white/50 hover:text-white hover:border-white/30 transition-all active:scale-95"
+          >
+            Home
+          </Link>
+          <LogoutButton />
+        </div>
       </header>
 
       {projectList.length > 0 ? (
