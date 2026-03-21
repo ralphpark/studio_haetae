@@ -496,16 +496,17 @@ function parseHtmlToNotionBlocks(rawHtml: string): NotionBlock[] {
     return `<p>__LIST_${lists.length - 1}__</p>`;
   });
 
-  // 4. 블록 단위로 분리
-  const blockPattern = /<(h1|h2|h3|p|div)[^>]*>([\s\S]*?)<\/\1>/gi;
-  let match;
+  // 4. 블록 단위로 분리 — 태그가 있는 요소와 태그 없는 텍스트 모두 캡처
+  const segments = html.split(/(<(?:h1|h2|h3|p|div)[^>]*>[\s\S]*?<\/(?:h1|h2|h3|p|div)>)/gi).filter(s => s.trim());
 
-  while ((match = blockPattern.exec(html)) !== null) {
-    const tag = match[1].toLowerCase();
-    const content = match[2].trim();
+  for (const segment of segments) {
+    // 태그로 감싼 블록인지 체크
+    const tagMatch = segment.match(/^<(h1|h2|h3|p|div)[^>]*>([\s\S]*?)<\/\1>$/i);
+    const tag = tagMatch ? tagMatch[1].toLowerCase() : null;
+    const content = tagMatch ? tagMatch[2].trim() : segment.trim();
 
     // 테이블 플레이스홀더 체크
-    const tableMatch = content.match(/^__TABLE_(\d+)__$/);
+    const tableMatch = content.match(/__TABLE_(\d+)__/);
     if (tableMatch) {
       const tableBlock = parseHtmlTable(tables[parseInt(tableMatch[1])]);
       if (tableBlock) blocks.push(tableBlock);
@@ -513,7 +514,7 @@ function parseHtmlToNotionBlocks(rawHtml: string): NotionBlock[] {
     }
 
     // 리스트 플레이스홀더 체크
-    const listMatch = content.match(/^__LIST_(\d+)__$/);
+    const listMatch = content.match(/__LIST_(\d+)__/);
     if (listMatch) {
       const listHtml = lists[parseInt(listMatch[1])];
       const items = [...listHtml.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)];
@@ -554,6 +555,7 @@ function parseHtmlToNotionBlocks(rawHtml: string): NotionBlock[] {
         heading_3: { rich_text: [{ text: { content: text } }] },
       });
     } else {
+      // tag === "p" | "div" | null (태그 없는 텍스트)
       blocks.push({
         object: "block",
         type: "paragraph",
