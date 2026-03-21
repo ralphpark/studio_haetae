@@ -47,18 +47,20 @@ export async function POST(
       }
     }
 
-    // Create Discord channel
+    // Create Discord channel if method is 메신저 미팅
     let discordChannelId: string | null = null;
     let discordInvite: string | null = null;
-    try {
-      const discord = await createProjectChannel({
-        projectName: project.title || id.slice(0, 8),
-        companyName: project.company || undefined,
-      });
-      discordChannelId = discord.channelId;
-      discordInvite = discord.inviteLink;
-    } catch (e) {
-      console.error("Discord channel creation failed:", e);
+    if (method?.includes("Discord")) {
+      try {
+        const discord = await createProjectChannel({
+          projectName: project.title || id.slice(0, 8),
+          companyName: project.company || undefined,
+        });
+        discordChannelId = discord.channelId;
+        discordInvite = discord.inviteLink;
+      } catch (e) {
+        console.error("Discord channel creation failed:", e);
+      }
     }
 
     // Create meeting
