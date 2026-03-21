@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 
 const TOTAL_STEPS = 5;
 
@@ -163,6 +164,22 @@ export function ContactForm() {
     referenceUrl: "",
     message: "",
   });
+
+  // 로그인 상태면 유저 정보 프리필
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setFormData((prev) => ({
+          ...prev,
+          name: user.user_metadata?.name || prev.name,
+          email: user.email || prev.email,
+          phone: user.user_metadata?.phone || prev.phone,
+          company: user.user_metadata?.company || prev.company,
+        }));
+      }
+    });
+  }, []);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
