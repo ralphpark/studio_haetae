@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ProposalModal } from "./ProposalModal";
 import { MeetingCard } from "./MeetingCard";
@@ -320,7 +320,7 @@ export function ProposalView({
   const [isRequesting, setIsRequesting] = useState(false);
   const [docsConfirmed, setDocsConfirmed] = useState(initialDocsConfirmed ?? false);
   const [notionUrl, setNotionUrl] = useState(initialNotionUrl || "");
-  const [isChecking, setIsChecking] = useState(false);
+  const [showMeeting, setShowMeeting] = useState(false);
 
   const handleProposalClick = async () => {
     // Already generated — just open modal
@@ -356,6 +356,32 @@ export function ProposalView({
     }
   };
 
+  // Notion 수정완료 polling (5초 간격)
+  const pollNotion = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/check-notion`);
+      const data = await res.json();
+      if (data.confirmed) {
+        setDocsConfirmed(true);
+        setNotionUrl(data.notionUrl || "");
+        setCurrentStep(3);
+        return true; // stop polling
+      }
+    } catch {
+      // ignore
+    }
+    return false;
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!docsRequested || docsConfirmed) return;
+    const interval = setInterval(async () => {
+      const done = await pollNotion();
+      if (done) clearInterval(interval);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [docsRequested, docsConfirmed, pollNotion]);
+
   const handleRequestDocs = async () => {
     setIsRequesting(true);
     try {
@@ -371,23 +397,6 @@ export function ProposalView({
       console.error(err);
     } finally {
       setIsRequesting(false);
-    }
-  };
-
-  const handleCheckNotion = async () => {
-    setIsChecking(true);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/check-notion`);
-      const data = await res.json();
-      if (data.confirmed) {
-        setDocsConfirmed(true);
-        setNotionUrl(data.notionUrl || "");
-        setCurrentStep(3);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsChecking(false);
     }
   };
 
@@ -448,11 +457,9 @@ export function ProposalView({
               <h3 className="text-lg font-bold">기획서 & 견적서</h3>
               <p className="text-white/50 text-sm mt-1">
                 {docsConfirmed
-                  ? "기획서와 견적서가 확정되었습니다. 아래 링크에서 확인하세요."
-                  : docsRequested && (planningDoc || estimate)
-                  ? "AI가 기획서와 견적서를 작성했습니다. Notion에서 수정 후 '수정완료'를 체크해주세요."
+                  ? "기획서와 견적서가 준비되었습니다."
                   : docsRequested
-                  ? "AI가 기획서와 견적서를 생성하고 있습니다..."
+                  ? "Studio HaeTae에서 기획서와 견적서를 작성하고 있습니다. 작성이 완료되면 링크가 제공됩니다."
                   : "상세 기획서와 견적서를 받아보시겠습니까?"}
               </p>
             </div>
@@ -470,52 +477,67 @@ export function ProposalView({
               </button>
             )}
 
-            {/* 요청했지만 아직 Notion 확정 안 됨 */}
+            {/* 요청했지만 아직 확정 안 됨 - 대기 상태 */}
             {docsRequested && !docsConfirmed && (
-              <div className="flex flex-col gap-3">
-                <div className="px-4 py-3 bg-white/5 border border-white/5 rounded-xl text-white/40 text-sm">
-                  Notion에서 기획서와 견적서를 검토하신 후, &apos;수정완료&apos; 체크박스를 눌러주세요.
+              <div className="bg-white/5 border border-white/10 rounded-xl p-5 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-white/50 text-sm">상세 기획서</span>
+                  <span className="text-white/20 text-sm">작성 중...</span>
                 </div>
-                <button
-                  onClick={handleCheckNotion}
-                  disabled={isChecking}
-                  className="w-fit px-6 py-2.5 bg-white/10 border border-white/10 rounded-full text-sm font-medium hover:bg-white/20 active:scale-95 transition-all disabled:opacity-50"
-                >
-                  {isChecking ? "확인 중..." : "Notion 수정완료 확인하기"}
-                </button>
+                <div className="w-full h-px bg-white/5" />
+                <div className="flex items-center justify-between">
+                  <span className="text-white/50 text-sm">견적서</span>
+                  <span className="text-white/20 text-sm">작성 중...</span>
+                </div>
               </div>
             )}
 
-            {/* 확정 완료 - 문서 미리보기 + Notion 링크 */}
+            {/* 확정 완료 - Notion 링크 제공 */}
             {docsConfirmed && (
-              <div className="flex flex-col gap-3">
-                <DocumentCard
-                  documentUrls={documentUrls || null}
-                  planningDoc={planningDoc}
-                  estimate={estimate}
-                  isConfirmed={true}
-                />
-                {notionUrl && (
-                  <a
-                    href={notionUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-fit px-5 py-2.5 bg-white text-black rounded-full text-sm font-medium hover:bg-white/90 active:scale-95 transition-all flex items-center gap-2"
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col gap-3"
+              >
+                <div className="bg-white/5 border border-white/10 rounded-xl p-5 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/70 text-sm">상세 기획서</span>
+                    {notionUrl ? (
+                      <a href={notionUrl} target="_blank" rel="noopener noreferrer" className="text-accent text-sm hover:underline">
+                        문서 보기 →
+                      </a>
+                    ) : (
+                      <span className="text-green-400 text-sm">완료</span>
+                    )}
+                  </div>
+                  <div className="w-full h-px bg-white/5" />
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/70 text-sm">견적서</span>
+                    {notionUrl ? (
+                      <a href={notionUrl} target="_blank" rel="noopener noreferrer" className="text-accent text-sm hover:underline">
+                        문서 보기 →
+                      </a>
+                    ) : (
+                      <span className="text-green-400 text-sm">완료</span>
+                    )}
+                  </div>
+                </div>
+                {!showMeeting && (
+                  <button
+                    onClick={() => setShowMeeting(true)}
+                    className="w-fit px-6 py-2.5 bg-white text-black rounded-full text-sm font-medium hover:bg-white/90 active:scale-95 transition-all"
                   >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M4 4.5A2.5 2.5 0 016.5 2H14l6 6v11.5a2.5 2.5 0 01-2.5 2.5h-11A2.5 2.5 0 014 19.5v-15zM14 2.5V8h5.5L14 2.5z" />
-                    </svg>
-                    Notion에서 확정 문서 보기
-                  </a>
+                    1차 미팅 진행하기
+                  </button>
                 )}
-              </div>
+              </motion.div>
             )}
           </div>
         </motion.div>
       )}
 
-      {/* Step 3+: 미팅 (기획서/견적서 확정 후 표시) */}
-      {docsConfirmed && (
+      {/* Step 3: 미팅 카드 (1차 미팅 진행하기 클릭 후 표시) */}
+      {(showMeeting || meeting) && (
         <MeetingCard
           projectId={projectId}
           existingMeeting={meeting}

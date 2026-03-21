@@ -90,7 +90,7 @@ export function MeetingCard({
       className="bg-white/5 border border-white/10 rounded-2xl p-6 sm:p-8"
     >
       <div className="flex items-start gap-4 mb-4">
-        <span className="text-white/10 text-3xl font-bold font-mono leading-none">02</span>
+        <span className="text-white/10 text-3xl font-bold font-mono leading-none">03</span>
         <div>
           <h3 className="text-lg font-bold">1차 미팅</h3>
           <p className="text-white/50 text-sm mt-1">
