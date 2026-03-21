@@ -13,10 +13,10 @@ interface NavbarProps {
 }
 
 const navLinks = [
-  { href: "#about", label: "ABOUT" },
-  { href: "#portfolio", label: "WORK" },
-  { href: "#process", label: "PROCESS" },
-  { href: "#contact", label: "CONSULTING" },
+  { href: "/#about", label: "ABOUT" },
+  { href: "/#portfolio", label: "WORK" },
+  { href: "/#process", label: "PROCESS" },
+  { href: "/#contact", label: "CONSULTING" },
 ];
 
 export function Navbar({ bgClass = "bg-[#070808]/95 backdrop-blur-md border-b border-[#E7E5DF]/10", positionClass = "relative z-[80]" }: NavbarProps) {
@@ -40,9 +40,15 @@ export function Navbar({ bgClass = "bg-[#070808]/95 backdrop-blur-md border-b bo
 
   const handleNavClick = (href: string) => {
     setMobileOpen(false);
-    if (href.startsWith("#")) {
-      const el = document.querySelector(href);
-      if (el) el.scrollIntoView({ behavior: "smooth" });
+    if (href.startsWith("/#")) {
+      const hash = href.slice(1);
+      const isHome = window.location.pathname === "/";
+      if (isHome) {
+        const el = document.querySelector(hash);
+        if (el) el.scrollIntoView({ behavior: "smooth" });
+      } else {
+        router.push(href);
+      }
     }
   };
 
@@ -53,9 +59,10 @@ export function Navbar({ bgClass = "bg-[#070808]/95 backdrop-blur-md border-b bo
       >
         {/* 1. Left: Metallic Logo */}
         <div className="pointer-events-auto">
-          <button
-            onClick={() => { setMobileOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-            className="block transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+          <Link
+            href="/"
+            onClick={() => setMobileOpen(false)}
+            className="block transition-transform hover:scale-105 active:scale-95"
           >
             <Image
               src="/logo-v5.png"
@@ -65,7 +72,7 @@ export function Navbar({ bgClass = "bg-[#070808]/95 backdrop-blur-md border-b bo
               className="w-auto h-12 md:h-20 object-contain drop-shadow-2xl"
               priority
             />
-          </button>
+          </Link>
         </div>
 
         {/* 2. Center: Desktop Navigation */}
@@ -85,7 +92,7 @@ export function Navbar({ bgClass = "bg-[#070808]/95 backdrop-blur-md border-b bo
                 href="/portal"
                 className="font-mono text-sm tracking-widest text-[#E7E5DF] hover:text-accent transition-colors"
               >
-                PORTAL
+                DASHBOARD
               </Link>
               <button
                 onClick={handleLogout}
@@ -154,7 +161,7 @@ export function Navbar({ bgClass = "bg-[#070808]/95 backdrop-blur-md border-b bo
                     onClick={() => setMobileOpen(false)}
                     className="font-mono text-sm tracking-widest text-[#E7E5DF]/50 hover:text-accent transition-colors"
                   >
-                    PORTAL →
+                    DASHBOARD →
                   </Link>
                   <button
                     onClick={handleLogout}

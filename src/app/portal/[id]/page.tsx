@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { ProposalView } from "@/components/portal/ProposalView";
+import { Navbar } from "@/components/layout/Navbar";
 
 export default async function ProjectDetailPage({
   params,
@@ -40,15 +41,17 @@ export default async function ProjectDetailPage({
   const meeting = meetings?.[0] || null;
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-6 py-24 flex flex-col gap-8">
-      {/* Back + Header */}
-      <div className="flex flex-col gap-4">
-        <a
-          href="/portal"
-          className="text-white/40 text-sm hover:text-white/60 transition-colors w-fit"
-        >
-          ← 대시보드로 돌아가기
-        </a>
+    <>
+      <Navbar />
+      <div className="w-full max-w-5xl mx-auto px-6 py-12 flex flex-col gap-8">
+        {/* Back + Header */}
+        <div className="flex flex-col gap-4">
+          <a
+            href="/portal"
+            className="text-white/40 text-sm hover:text-white/60 transition-colors w-fit"
+          >
+            ← 대시보드로 돌아가기
+          </a>
         <div className="flex items-center gap-3">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tighter">
             {project.project_name || `프로젝트 ${project.project_number}`}
@@ -83,6 +86,7 @@ export default async function ProjectDetailPage({
         planningDoc={project.planning_doc}
         estimate={project.estimate}
       />
-    </div>
+      </div>
+    </>
   );
 }
