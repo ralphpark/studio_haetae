@@ -99,6 +99,7 @@ export default async function ProjectDetailPage({
         docsConfirmed={project.docs_confirmed ?? false}
         notionPublicUrl={project.notion_public_url}
         contract={contract}
+        discordInvite={project.discord_invite}
       />
     </div>
   );

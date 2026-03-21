@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { createHash } from "crypto";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { Resend } from "resend";
+import { createProjectChannel } from "@/utils/discord";
 
 export async function POST(
   req: Request,
@@ -123,11 +124,40 @@ export async function POST(
     .eq("user_id", user.id)
     .single();
 
-  await supabase
-    .from("projects")
-    .update({ step: 6 })
-    .eq("id", id)
-    .eq("user_id", user.id);
+  // Create Discord channel for project kickoff
+  let discordInvite: string | null = null;
+  if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_GUILD_ID) {
+    try {
+      const discord = await createProjectChannel({
+        projectName: project?.project_name || "project",
+        companyName: project?.company || undefined,
+      });
+      discordInvite = discord.inviteLink;
+
+      await supabase
+        .from("projects")
+        .update({
+          step: 6,
+          discord_channel_id: discord.channelId,
+          discord_invite: discord.inviteLink,
+        })
+        .eq("id", id)
+        .eq("user_id", user.id);
+    } catch (e) {
+      console.error("[CONTRACT] Discord channel creation failed:", e);
+      await supabase
+        .from("projects")
+        .update({ step: 6 })
+        .eq("id", id)
+        .eq("user_id", user.id);
+    }
+  } else {
+    await supabase
+      .from("projects")
+      .update({ step: 6 })
+      .eq("id", id)
+      .eq("user_id", user.id);
+  }
 
   // Generate signed PDF and send email (background)
   generateSignedPdfAndEmail({

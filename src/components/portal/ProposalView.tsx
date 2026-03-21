@@ -318,6 +318,7 @@ export function ProposalView({
   docsConfirmed: initialDocsConfirmed,
   notionPublicUrl: initialNotionUrl,
   contract,
+  discordInvite,
 }: {
   projectId: string;
   initialProposal: Proposal | null;
@@ -331,6 +332,7 @@ export function ProposalView({
   docsConfirmed?: boolean;
   notionPublicUrl?: string | null;
   contract?: ContractData | null;
+  discordInvite?: string | null;
 }) {
   const [proposal, setProposal] = useState<Proposal | null>(initialProposal);
   const [currentPlanningDoc, setCurrentPlanningDoc] = useState(planningDoc || null);
@@ -570,7 +572,7 @@ export function ProposalView({
       )}
 
       {/* Step 6: 킥오프 (계약 완료 후 표시) */}
-      {currentStep >= 6 && <KickoffCard discordInvite={meeting?.discord_invite} />}
+      {currentStep >= 6 && <KickoffCard discordInvite={discordInvite} />}
 
       {/* Proposal Modal */}
       <AnimatePresence>
