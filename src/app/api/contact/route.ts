@@ -22,6 +22,11 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (user) {
+      // 유저 메타데이터에 연락처/회사 저장 (다음 상담 시 프리필용)
+      await supabase.auth.updateUser({
+        data: { phone: phone || undefined, company: company || undefined },
+      });
+
       // Get next project number for this user
       const { count } = await supabase
         .from("projects")

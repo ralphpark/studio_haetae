@@ -165,27 +165,18 @@ export function ContactForm() {
     message: "",
   });
 
-  // 로그인 상태면 유저 정보 + 최근 프로젝트에서 프리필
+  // 로그인 상태면 유저 정보에서 프리필
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
-
-      // 최근 프로젝트에서 연락처/회사 가져오기
-      const { data: lastProject } = await supabase
-        .from("projects")
-        .select("phone, company")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-
+      const meta = user.user_metadata || {};
       setFormData((prev) => ({
         ...prev,
-        name: user.user_metadata?.name || prev.name,
+        name: meta.name || prev.name,
         email: user.email || prev.email,
-        phone: lastProject?.phone || prev.phone,
-        company: lastProject?.company || prev.company,
+        phone: meta.phone || prev.phone,
+        company: meta.company || prev.company,
       }));
     });
   }, []);
