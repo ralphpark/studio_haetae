@@ -55,6 +55,21 @@ export async function createMeetEvent({
   };
 }
 
+export async function deleteMeetEvent(eventId: string): Promise<boolean> {
+  try {
+    const auth = getAuth();
+    const calendar = google.calendar({ version: "v3", auth });
+    await calendar.events.delete({
+      calendarId: process.env.GOOGLE_CALENDAR_ID!,
+      eventId,
+    });
+    return true;
+  } catch (error) {
+    console.error("Google Calendar delete error:", error);
+    return false;
+  }
+}
+
 export async function getBusySlots(date: string): Promise<string[]> {
   const auth = getAuth();
   const calendar = google.calendar({ version: "v3", auth });

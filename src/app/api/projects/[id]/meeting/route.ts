@@ -34,6 +34,7 @@ export async function POST(
 
     // Create Google Meet if method is 화상 미팅
     let meetLink: string | null = null;
+    let calendarEventId: string | null = null;
     if (method?.includes("Google Meet")) {
       try {
         const result = await createMeetEvent({
@@ -43,6 +44,7 @@ export async function POST(
           description: `프로젝트 미팅\n연락처: ${contact_phone}${memo ? `\n메모: ${memo}` : ""}`,
         });
         meetLink = result.meetLink;
+        calendarEventId = result.eventId;
       } catch (e) {
         console.error("Google Meet creation failed:", e);
       }
@@ -74,6 +76,7 @@ export async function POST(
       contact_phone,
       memo: memo || null,
       meet_link: meetLink,
+      calendar_event_id: calendarEventId,
       discord_channel_id: discordChannelId,
       discord_invite: discordInvite,
     });

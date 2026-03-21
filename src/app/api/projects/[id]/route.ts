@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { Client } from "@notionhq/client";
+import { deleteMeetEvent } from "@/utils/google-calendar";
 
 export async function PATCH(
   req: Request,
@@ -83,6 +84,22 @@ export async function DELETE(
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    // Delete Google Calendar events for meetings
+    const { data: meetings } = await supabase
+      .from("meetings")
+      .select("calendar_event_id")
+      .eq("project_id", id);
+
+    if (meetings) {
+      for (const m of meetings) {
+        if (m.calendar_event_id) {
+          deleteMeetEvent(m.calendar_event_id).catch((err) =>
+            console.error("[CALENDAR] Event delete error:", err)
+          );
+        }
+      }
     }
 
     // Delete from Supabase (cascade deletes meetings too)
