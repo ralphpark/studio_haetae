@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createMeetEvent } from "@/utils/google-calendar";
 import { createProjectChannel } from "@/utils/discord";
+import { Resend } from "resend";
 
 export async function POST(
   req: Request,
@@ -88,6 +89,37 @@ export async function POST(
         .update({ step: 4 })
         .eq("id", id)
         .eq("user_id", user.id);
+    }
+
+    // Send booking confirmation email
+    if (process.env.RESEND_API_KEY && user.email) {
+      try {
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const meetInfo = meetLink
+          ? `<p><a href="${meetLink}" style="background: #fff; color: #000; padding: 10px 20px; border-radius: 9999px; text-decoration: none; font-weight: 600;">Google Meet 참여하기</a></p>`
+          : discordInvite
+          ? `<p><a href="${discordInvite}" style="background: #5865F2; color: #fff; padding: 10px 20px; border-radius: 9999px; text-decoration: none; font-weight: 600;">Discord 메신저 참여하기</a></p>`
+          : "";
+
+        await resend.emails.send({
+          from: "Studio HaeTae <hello@haetae.studio>",
+          to: user.email,
+          subject: "[Studio HaeTae] 1차 미팅이 예약되었습니다",
+          html: `<h1>1차 미팅 예약 확인</h1>
+<p>안녕하세요! Studio HaeTae 비즈니스 빌더 팀입니다.</p>
+<p>1차 미팅이 아래 일정으로 예약되었습니다.</p>
+<table style="margin: 16px 0; border-collapse: collapse;">
+  <tr><td style="padding: 8px 16px 8px 0; color: #888;">날짜</td><td style="padding: 8px 0; font-weight: 600;">${preferred_date}</td></tr>
+  <tr><td style="padding: 8px 16px 8px 0; color: #888;">시간</td><td style="padding: 8px 0; font-weight: 600;">${preferred_time}</td></tr>
+  <tr><td style="padding: 8px 16px 8px 0; color: #888;">방법</td><td style="padding: 8px 0; font-weight: 600;">${method}</td></tr>
+</table>
+${meetInfo}
+<hr style="margin-top: 32px; border: none; border-top: 1px solid #333;" />
+<p style="color: #888; font-size: 12px;">Studio HaeTae | Guardians of Innovation, Architects of Scale.</p>`,
+        });
+      } catch (emailErr) {
+        console.error("Meeting confirmation email failed:", emailErr);
+      }
     }
 
     return NextResponse.json({
