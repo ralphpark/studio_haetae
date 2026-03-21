@@ -59,6 +59,9 @@ export default async function PortalPage() {
           <p className="text-white/50 text-base">
             Welcome back, {userName}.
           </p>
+          <p className="text-white/30 text-sm font-mono">
+            {user.email}
+          </p>
         </div>
         <div className="flex items-center gap-4">
           <Link
