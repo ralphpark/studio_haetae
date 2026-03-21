@@ -10,6 +10,7 @@ interface Contract {
   contract_html?: string | null;
   admin_signature_url?: string | null;
   client_signature_url?: string | null;
+  client_name?: string | null;
   signed_at?: string | null;
 }
 
@@ -113,6 +114,7 @@ export function ContractCard({
                 status: "signed",
                 signed_at: data.signed_at,
                 client_signature_url: data.client_signature_url,
+                client_name: signerName.trim(),
               }
             : prev
         );
@@ -361,9 +363,10 @@ export function ContractCard({
 
               {/* 서명 미리보기 */}
               <div className="grid grid-cols-2 gap-4 pt-3 border-t border-white/10">
-                {contract.admin_signature_url && (
-                  <div>
-                    <p className="text-white/40 text-xs mb-2">갑 (수급자) 서명</p>
+                <div>
+                  <p className="text-white/40 text-xs mb-1">갑 (수급자)</p>
+                  <p className="text-sm text-white/80 font-medium mb-2">Studio HaeTae 대표 박근수</p>
+                  {contract.admin_signature_url && (
                     <div className="bg-white rounded-lg p-2 inline-block">
                       <img
                         src={contract.admin_signature_url}
@@ -371,11 +374,14 @@ export function ContractCard({
                         className="h-12 object-contain"
                       />
                     </div>
-                  </div>
-                )}
-                {contract.client_signature_url && (
-                  <div>
-                    <p className="text-white/40 text-xs mb-2">을 (발주자) 서명</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-white/40 text-xs mb-1">을 (발주자)</p>
+                  <p className="text-sm text-white/80 font-medium mb-2">
+                    {contract.client_name || "고객"}
+                  </p>
+                  {contract.client_signature_url && (
                     <div className="bg-white rounded-lg p-2 inline-block">
                       <img
                         src={contract.client_signature_url}
@@ -383,8 +389,8 @@ export function ContractCard({
                         className="h-12 object-contain"
                       />
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               <button

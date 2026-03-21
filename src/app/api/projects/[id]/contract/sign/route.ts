@@ -83,6 +83,7 @@ export async function POST(
     .from("contracts")
     .update({
       client_signature_url: urlData.publicUrl,
+      client_name: signer_name || null,
       status: "signed",
       signed_at: now,
       document_hash: contractHash,

@@ -43,6 +43,7 @@ interface ContractData {
   contract_html?: string | null;
   admin_signature_url?: string | null;
   client_signature_url?: string | null;
+  client_name?: string | null;
   signed_at?: string | null;
 }
 

@@ -44,7 +44,7 @@ export default async function ProjectDetailPage({
   // Fetch contract if exists
   const { data: contracts } = await supabase
     .from("contracts")
-    .select("id, status, contract_html, admin_signature_url, client_signature_url, signed_at")
+    .select("id, status, contract_html, admin_signature_url, client_signature_url, client_name, signed_at")
     .eq("project_id", id)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
