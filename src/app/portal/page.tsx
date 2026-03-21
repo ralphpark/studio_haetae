@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { LogoutButton } from "@/components/portal/LogoutButton";
 import { ProjectCard } from "@/components/portal/ProjectCard";
 
+export const dynamic = "force-dynamic";
+
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
