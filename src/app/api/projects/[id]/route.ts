@@ -95,10 +95,24 @@ export async function DELETE(
     if (meetings) {
       for (const m of meetings) {
         if (m.calendar_event_id) {
-          deleteMeetEvent(m.calendar_event_id).catch((err) =>
+          await deleteMeetEvent(m.calendar_event_id).catch((err) =>
             console.error("[CALENDAR] Event delete error:", err)
           );
         }
+      }
+    }
+
+    // Archive Notion page BEFORE deleting from Supabase
+    if (project.notion_page_id && process.env.NOTION_API_KEY) {
+      try {
+        const notion = new Client({ auth: process.env.NOTION_API_KEY });
+        await notion.pages.update({
+          page_id: project.notion_page_id,
+          archived: true,
+        });
+        console.log("[NOTION] Archived page:", project.notion_page_id);
+      } catch (err) {
+        console.error("[NOTION] Archive error:", err);
       }
     }
 
@@ -111,15 +125,6 @@ export async function DELETE(
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    // Archive Notion page (Notion doesn't have hard delete via API)
-    if (project.notion_page_id && process.env.NOTION_API_KEY) {
-      const notion = new Client({ auth: process.env.NOTION_API_KEY });
-      notion.pages.update({
-        page_id: project.notion_page_id,
-        archived: true,
-      }).catch((err) => console.error("[NOTION] Archive error:", err));
     }
 
     return NextResponse.json({ success: true });
