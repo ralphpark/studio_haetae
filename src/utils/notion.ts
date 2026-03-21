@@ -464,51 +464,58 @@ type NotionBlock = {
   [key: string]: unknown;
 };
 
-function parseHtmlToNotionBlocks(html: string): NotionBlock[] {
+function parseHtmlToNotionBlocks(rawHtml: string): NotionBlock[] {
   const blocks: NotionBlock[] = [];
 
-  // 테이블을 먼저 추출하여 플레이스홀더로 치환
+  // 1. DOCTYPE, html, head, body 등 문서 래퍼 제거 → body 내용만 추출
+  let html = rawHtml;
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  if (bodyMatch) {
+    html = bodyMatch[1];
+  } else {
+    // body 태그가 없으면 문서 구조 태그만 제거
+    html = html
+      .replace(/<!DOCTYPE[^>]*>/gi, "")
+      .replace(/<\/?html[^>]*>/gi, "")
+      .replace(/<head[\s\S]*?<\/head>/gi, "")
+      .replace(/<\/?body[^>]*>/gi, "");
+  }
+  html = html.trim();
+
+  // 2. 테이블을 추출하여 플레이스홀더로 치환
   const tables: string[] = [];
-  const htmlWithPlaceholders = html.replace(
-    /<table[^>]*>([\s\S]*?)<\/table>/gi,
-    (_match, tableContent) => {
-      tables.push(tableContent);
-      return `__TABLE_${tables.length - 1}__`;
-    }
-  );
+  html = html.replace(/<table[^>]*>([\s\S]*?)<\/table>/gi, (_m, content) => {
+    tables.push(content);
+    return `<p>__TABLE_${tables.length - 1}__</p>`;
+  });
 
-  // 리스트 블록 추출
-  const listBlocks: string[] = [];
-  const htmlWithoutLists = htmlWithPlaceholders.replace(
-    /<[ou]l[^>]*>([\s\S]*?)<\/[ou]l>/gi,
-    (_match, listContent) => {
-      listBlocks.push(listContent);
-      return `__LIST_${listBlocks.length - 1}__`;
-    }
-  );
+  // 3. 리스트를 추출하여 플레이스홀더로 치환
+  const lists: string[] = [];
+  html = html.replace(/<[ou]l[^>]*>([\s\S]*?)<\/[ou]l>/gi, (_m, content) => {
+    lists.push(content);
+    return `<p>__LIST_${lists.length - 1}__</p>`;
+  });
 
-  // 블록 단위로 분리 (h1, h2, h3, p, div, br 등)
-  const blockPattern = /<(h1|h2|h3|p|div)[^>]*>([\s\S]*?)<\/\1>|__TABLE_(\d+)__|__LIST_(\d+)__|([^<]+)/gi;
+  // 4. 블록 단위로 분리
+  const blockPattern = /<(h1|h2|h3|p|div)[^>]*>([\s\S]*?)<\/\1>/gi;
   let match;
 
-  while ((match = blockPattern.exec(htmlWithoutLists)) !== null) {
-    const tag = match[1]?.toLowerCase();
-    const content = match[2];
-    const tableIdx = match[3];
-    const listIdx = match[4];
-    const plainText = match[5];
+  while ((match = blockPattern.exec(html)) !== null) {
+    const tag = match[1].toLowerCase();
+    const content = match[2].trim();
 
-    // 테이블 플레이스홀더
-    if (tableIdx !== undefined) {
-      const tableHtml = tables[parseInt(tableIdx)];
-      const tableBlock = parseHtmlTable(tableHtml);
+    // 테이블 플레이스홀더 체크
+    const tableMatch = content.match(/^__TABLE_(\d+)__$/);
+    if (tableMatch) {
+      const tableBlock = parseHtmlTable(tables[parseInt(tableMatch[1])]);
       if (tableBlock) blocks.push(tableBlock);
       continue;
     }
 
-    // 리스트 플레이스홀더
-    if (listIdx !== undefined) {
-      const listHtml = listBlocks[parseInt(listIdx)];
+    // 리스트 플레이스홀더 체크
+    const listMatch = content.match(/^__LIST_(\d+)__$/);
+    if (listMatch) {
+      const listHtml = lists[parseInt(listMatch[1])];
       const items = [...listHtml.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)];
       for (const item of items) {
         const text = stripTags(item[1]).slice(0, 2000);
@@ -525,55 +532,35 @@ function parseHtmlToNotionBlocks(html: string): NotionBlock[] {
       continue;
     }
 
+    const text = stripTags(content).slice(0, 2000);
+    if (!text) continue;
+
     if (tag === "h1") {
-      const text = stripTags(content).slice(0, 2000);
-      if (text) {
-        blocks.push({
-          object: "block",
-          type: "heading_1",
-          heading_1: { rich_text: [{ text: { content: text } }] },
-        });
-      }
+      blocks.push({
+        object: "block",
+        type: "heading_1",
+        heading_1: { rich_text: [{ text: { content: text } }] },
+      });
     } else if (tag === "h2") {
-      const text = stripTags(content).slice(0, 2000);
-      if (text) {
-        blocks.push({
-          object: "block",
-          type: "heading_2",
-          heading_2: { rich_text: [{ text: { content: text } }] },
-        });
-      }
+      blocks.push({
+        object: "block",
+        type: "heading_2",
+        heading_2: { rich_text: [{ text: { content: text } }] },
+      });
     } else if (tag === "h3") {
-      const text = stripTags(content).slice(0, 2000);
-      if (text) {
-        blocks.push({
-          object: "block",
-          type: "heading_3",
-          heading_3: { rich_text: [{ text: { content: text } }] },
-        });
-      }
-    } else if (tag === "p" || tag === "div") {
-      const text = stripTags(content).slice(0, 2000);
-      if (text) {
-        blocks.push({
-          object: "block",
-          type: "paragraph",
-          paragraph: {
-            rich_text: [{ text: { content: text } }],
-          },
-        });
-      }
-    } else if (plainText) {
-      const text = plainText.trim();
-      if (text && text.length > 1) {
-        blocks.push({
-          object: "block",
-          type: "paragraph",
-          paragraph: {
-            rich_text: [{ text: { content: text.slice(0, 2000) } }],
-          },
-        });
-      }
+      blocks.push({
+        object: "block",
+        type: "heading_3",
+        heading_3: { rich_text: [{ text: { content: text } }] },
+      });
+    } else {
+      blocks.push({
+        object: "block",
+        type: "paragraph",
+        paragraph: {
+          rich_text: [{ text: { content: text } }],
+        },
+      });
     }
   }
 

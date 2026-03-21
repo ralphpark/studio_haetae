@@ -171,7 +171,8 @@ async function generateContractDraft(
 - 담당자: ${project.name}
 - 이메일: ${project.email}
 
-HTML만 반환하세요. 다른 텍스트 없이 HTML만 반환하세요.`;
+중요: <!DOCTYPE>, <html>, <head>, <body> 태그 없이 콘텐츠 HTML만 반환하세요.
+<h1>으로 시작해서 바로 본문 내용만 작성하세요. 다른 텍스트 없이 HTML만 반환하세요.`;
 
   const response = await model.generateContent(prompt);
   const contractHtml = parseAIText(response.response.text());
