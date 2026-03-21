@@ -73,15 +73,19 @@ export async function GET(
       return NextResponse.json({ ready: false, status: "preparing" });
     }
 
-    // 계약확정 됨! Notion에서 대표 서명 이미지만 가져오기
-    // (원본 AI 생성 HTML은 유지 — Notion 텍스트로 덮어쓰지 않음)
+    // 계약확정 됨! Notion에서 수정된 계약서 HTML + 대표 서명 이미지 가져오기
     const notionData = await getContractFromNotion(project.notion_page_id);
 
     const updateData: Record<string, unknown> = {
       status: "ready",
     };
 
-    // Notion에서 서명 이미지 URL만 가져오기
+    // Notion에서 수정된 계약서 HTML 반영
+    if (notionData?.contractHtml) {
+      updateData.contract_html = notionData.contractHtml;
+    }
+
+    // Notion에서 서명 이미지 URL 가져오기
     if (notionData?.adminSignatureUrl) {
       updateData.admin_signature_url = notionData.adminSignatureUrl;
     }

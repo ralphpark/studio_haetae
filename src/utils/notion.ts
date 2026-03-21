@@ -362,7 +362,7 @@ export async function createContractNotionPage(
  */
 export async function getContractFromNotion(
   notionPageId: string
-): Promise<{ contractText: string; adminSignatureUrl: string | null } | null> {
+): Promise<{ contractHtml: string; adminSignatureUrl: string | null } | null> {
   const notion = getNotionClient();
   if (!notion || !notionPageId) return null;
 
@@ -386,32 +386,108 @@ export async function getContractFromNotion(
 
     if (!contractPageId) return null;
 
-    // 계약서 페이지의 블록들 읽기
-    const contractBlocks = await notion.blocks.children.list({
-      block_id: contractPageId,
-      page_size: 100,
-    });
+    // 계약서 페이지의 블록들 읽기 (페이지네이션 지원)
+    let allBlocks: { type: string; [key: string]: unknown }[] = [];
+    let cursor: string | undefined = undefined;
+    do {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const resp: any = await notion.blocks.children.list({
+        block_id: contractPageId,
+        page_size: 100,
+        ...(cursor ? { start_cursor: cursor } : {}),
+      });
+      for (const b of resp.results) {
+        if ("type" in b) allBlocks.push(b);
+      }
+      cursor = resp.has_more ? resp.next_cursor : undefined;
+    } while (cursor);
 
-    let contractText = "";
+    let html = "";
     let adminSignatureUrl: string | null = null;
+    let inTable = false;
+    let tableHtml = "";
 
-    for (const block of contractBlocks.results) {
-      if (!("type" in block)) continue;
+    for (const block of allBlocks) {
+      const richTexts = (t: { plain_text: string; annotations?: { bold?: boolean } }[]) =>
+        t.map((r) => {
+          const escaped = r.plain_text
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          return r.annotations?.bold ? `<strong>${escaped}</strong>` : escaped;
+        }).join("");
 
-      if (block.type === "paragraph") {
-        const texts = (block as { paragraph: { rich_text: { plain_text: string }[] } }).paragraph.rich_text;
-        const text = texts.map((t) => t.plain_text).join("");
-        if (text !== "[여기에 서명 이미지를 삽입하세요]") {
-          contractText += text + "\n";
+      // 테이블 행이 끊기면 테이블 닫기
+      if (block.type !== "table_row" && inTable) {
+        html += `<table>${tableHtml}</table>`;
+        tableHtml = "";
+        inTable = false;
+      }
+
+      if (block.type === "heading_1") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const texts = (block as any).heading_1.rich_text;
+        html += `<h1>${richTexts(texts)}</h1>\n`;
+      } else if (block.type === "heading_2") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const texts = (block as any).heading_2.rich_text;
+        html += `<h2>${richTexts(texts)}</h2>\n`;
+      } else if (block.type === "heading_3") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const texts = (block as any).heading_3.rich_text;
+        html += `<h3>${richTexts(texts)}</h3>\n`;
+      } else if (block.type === "paragraph") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const texts = (block as any).paragraph.rich_text;
+        const text = texts.map((t: { plain_text: string }) => t.plain_text).join("");
+        if (text === "[여기에 서명 이미지를 삽입하세요]") continue;
+        if (text.trim()) {
+          html += `<p>${richTexts(texts)}</p>\n`;
         }
+      } else if (block.type === "bulleted_list_item") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const texts = (block as any).bulleted_list_item.rich_text;
+        html += `<ul><li>${richTexts(texts)}</li></ul>\n`;
+      } else if (block.type === "numbered_list_item") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const texts = (block as any).numbered_list_item.rich_text;
+        html += `<ul><li>${richTexts(texts)}</li></ul>\n`;
+      } else if (block.type === "table") {
+        // 테이블 시작 — children은 별도 fetch 필요
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tableChildren: any = await notion.blocks.children.list({
+          block_id: (block as any).id,
+          page_size: 100,
+        });
+        let tHtml = "<table>\n";
+        let isFirst = true;
+        for (const row of tableChildren.results) {
+          if (!("type" in row) || row.type !== "table_row") continue;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const cells = (row as any).table_row.cells;
+          const tag = isFirst ? "th" : "td";
+          tHtml += "<tr>";
+          for (const cell of cells) {
+            const cellText = cell.map((c: { plain_text: string }) => c.plain_text).join("");
+            tHtml += `<${tag}>${cellText}</${tag}>`;
+          }
+          tHtml += "</tr>\n";
+          isFirst = false;
+        }
+        tHtml += "</table>\n";
+        html += tHtml;
+      } else if (block.type === "table_row") {
+        // standalone table_row (not inside table block)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const cells = (block as any).table_row.cells;
+        inTable = true;
+        tableHtml += "<tr>";
+        for (const cell of cells) {
+          const cellText = cell.map((c: { plain_text: string }) => c.plain_text).join("");
+          tableHtml += `<td>${cellText}</td>`;
+        }
+        tableHtml += "</tr>\n";
       } else if (block.type === "image") {
-        const imageBlock = block as {
-          image: {
-            type: string;
-            file?: { url: string };
-            external?: { url: string };
-          };
-        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const imageBlock = block as any;
         const url =
           imageBlock.image.type === "file"
             ? imageBlock.image.file?.url
@@ -419,10 +495,19 @@ export async function getContractFromNotion(
         if (url) {
           adminSignatureUrl = url;
         }
+      } else if (block.type === "divider") {
+        // skip dividers (signature section markers)
+      } else if (block.type === "callout") {
+        // skip callout blocks (admin instructions)
       }
     }
 
-    return { contractText: contractText.trim(), adminSignatureUrl };
+    // 남은 테이블 닫기
+    if (inTable) {
+      html += `<table>${tableHtml}</table>`;
+    }
+
+    return { contractHtml: html.trim(), adminSignatureUrl };
   } catch (error) {
     console.error("[NOTION] Get contract error:", error);
     return null;
