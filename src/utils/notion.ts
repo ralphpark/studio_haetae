@@ -60,6 +60,12 @@ export async function createNotionProjectPage(data: ProjectData): Promise<string
         "날짜": {
           date: { start: new Date().toISOString().split("T")[0] },
         },
+        "신청자": {
+          rich_text: [{ text: { content: data.clientName } }],
+        },
+        "이메일": {
+          email: data.clientEmail,
+        },
       },
       children: [
         {
