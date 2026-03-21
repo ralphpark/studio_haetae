@@ -204,9 +204,21 @@ async function generateSignedPdfAndEmail({
   contractId: string;
   supabase: Awaited<ReturnType<typeof createClient>>;
 }) {
-  // 1. Generate PDF
+  // 1. Generate PDF with Korean font
   const pdf = await PDFDocument.create();
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
+
+  // Fetch and embed Korean font (Noto Sans KR)
+  const fontUrl = "https://cdn.jsdelivr.net/gh/googlefonts/noto-cjk@main/Sans/Variable/OTF/Subset/NotoSansKR-VF.otf";
+  let font;
+  try {
+    const fontRes = await fetch(fontUrl);
+    const fontBytes = new Uint8Array(await fontRes.arrayBuffer());
+    font = await pdf.embedFont(fontBytes, { subset: true });
+  } catch {
+    // Fallback to Helvetica (한글 깨질 수 있음)
+    font = await pdf.embedFont(StandardFonts.Helvetica);
+  }
+
   const fontSize = 10;
   const margin = 50;
 
@@ -229,31 +241,21 @@ async function generateSignedPdfAndEmail({
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  // Split text into lines that fit page width
-  const maxWidth = 495; // A4 width - margins
+  // Split text into lines — estimate width per char (Korean ~10px at 10pt)
+  const maxCharsPerLine = 45;
   const lines: string[] = [];
   for (const paragraph of plainText.split("\n")) {
     if (!paragraph.trim()) {
       lines.push("");
       continue;
     }
-    const words = paragraph.split("");
-    let currentLine = "";
-    for (const char of words) {
-      const testLine = currentLine + char;
-      const width = font.widthOfTextAtSize(testLine, fontSize);
-      if (width > maxWidth && currentLine) {
-        lines.push(currentLine);
-        currentLine = char;
-      } else {
-        currentLine = testLine;
-      }
+    for (let i = 0; i < paragraph.length; i += maxCharsPerLine) {
+      lines.push(paragraph.slice(i, i + maxCharsPerLine));
     }
-    if (currentLine) lines.push(currentLine);
   }
 
   // Paginate
-  const lineHeight = 14;
+  const lineHeight = 16;
   const pageHeight = 841.89; // A4
   const pageWidth = 595.28;
   const usableHeight = pageHeight - margin * 2;
@@ -264,13 +266,17 @@ async function generateSignedPdfAndEmail({
     const pageLines = lines.slice(i, i + linesPerPage);
 
     for (let j = 0; j < pageLines.length; j++) {
-      page.drawText(pageLines[j], {
-        x: margin,
-        y: pageHeight - margin - j * lineHeight,
-        size: fontSize,
-        font,
-        color: rgb(0, 0, 0),
-      });
+      try {
+        page.drawText(pageLines[j], {
+          x: margin,
+          y: pageHeight - margin - j * lineHeight,
+          size: fontSize,
+          font,
+          color: rgb(0, 0, 0),
+        });
+      } catch {
+        // Skip lines with unsupported characters
+      }
     }
   }
 
@@ -278,7 +284,7 @@ async function generateSignedPdfAndEmail({
   const sigPage = pdf.addPage([pageWidth, pageHeight]);
   let yPos = pageHeight - margin;
 
-  sigPage.drawText("SIGNATURES", {
+  sigPage.drawText("서명", {
     x: margin,
     y: yPos,
     size: 14,
@@ -288,7 +294,7 @@ async function generateSignedPdfAndEmail({
   yPos -= 40;
 
   // Admin signature
-  sigPage.drawText("Gap (Studio HaeTae) - Representative Park Geunsu", {
+  sigPage.drawText("갑 (Studio HaeTae) - 대표 박근수", {
     x: margin,
     y: yPos,
     size: 10,
@@ -318,7 +324,7 @@ async function generateSignedPdfAndEmail({
   yPos -= 30;
 
   // Client signature
-  sigPage.drawText(`Eul (Client) - ${signerName}`, {
+  sigPage.drawText(`을 (고객) - ${signerName}`, {
     x: margin,
     y: yPos,
     size: 10,
@@ -345,7 +351,7 @@ async function generateSignedPdfAndEmail({
 
   yPos -= 30;
   const dateStr = new Date(signedAt).toLocaleDateString("ko-KR");
-  sigPage.drawText(`Signed: ${dateStr}`, {
+  sigPage.drawText(`서명일: ${dateStr}`, {
     x: margin,
     y: yPos,
     size: 9,
