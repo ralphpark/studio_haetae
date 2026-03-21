@@ -19,11 +19,13 @@ export async function createProjectChannel({
   projectName: string;
   companyName?: string;
 }) {
-  const channelName = (companyName || projectName)
+  const today = new Date().toISOString().split("T")[0].replace(/-/g, "");
+  const base = companyName || projectName;
+  const channelName = `${base}-${projectName}-${today}`
     .toLowerCase()
     .replace(/[^a-z0-9가-힣ㄱ-ㅎ]/g, "-")
     .replace(/-+/g, "-")
-    .slice(0, 30);
+    .slice(0, 100);
 
   // Create channel
   const channel = await discordFetch(
