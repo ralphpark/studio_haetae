@@ -84,6 +84,9 @@ export default async function ProjectDetailPage({
         documentUrls={project.document_urls}
         planningDoc={project.planning_doc}
         estimate={project.estimate}
+        docsRequested={project.docs_requested ?? false}
+        docsConfirmed={project.docs_confirmed ?? false}
+        notionPublicUrl={project.notion_public_url}
       />
     </div>
   );
