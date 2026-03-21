@@ -347,10 +347,6 @@ export function ProposalView({
       setProposal(newProposal);
       if (currentStep < 1) setCurrentStep(1);
       setShowModal(true);
-
-      // 제안서 모달 표시 후, 기획서/견적서 백그라운드 생성 (별도 API)
-      fetch(`/api/projects/${projectId}/generate-docs`, { method: "POST" })
-        .catch((err) => console.error("Generate docs error:", err));
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "잠시 후 다시 확인해주세요."
@@ -474,15 +470,12 @@ export function ProposalView({
               </button>
             )}
 
-            {/* 요청했고 생성됨 - 인라인 미리보기 + Notion 확인 버튼 */}
-            {docsRequested && (planningDoc || estimate) && !docsConfirmed && (
-              <>
-                <DocumentCard
-                  documentUrls={documentUrls || null}
-                  planningDoc={planningDoc}
-                  estimate={estimate}
-                  isInProgress={true}
-                />
+            {/* 요청했지만 아직 Notion 확정 안 됨 */}
+            {docsRequested && !docsConfirmed && (
+              <div className="flex flex-col gap-3">
+                <div className="px-4 py-3 bg-white/5 border border-white/5 rounded-xl text-white/40 text-sm">
+                  Notion에서 기획서와 견적서를 검토하신 후, &apos;수정완료&apos; 체크박스를 눌러주세요.
+                </div>
                 <button
                   onClick={handleCheckNotion}
                   disabled={isChecking}
@@ -490,17 +483,10 @@ export function ProposalView({
                 >
                   {isChecking ? "확인 중..." : "Notion 수정완료 확인하기"}
                 </button>
-              </>
-            )}
-
-            {/* 요청했지만 아직 생성 안 됨 */}
-            {docsRequested && !planningDoc && !estimate && !docsConfirmed && (
-              <div className="px-4 py-3 bg-white/5 border border-white/5 rounded-xl text-white/30 text-sm">
-                AI가 문서를 생성하고 있습니다. 잠시 후 새로고침 해주세요.
               </div>
             )}
 
-            {/* 확정 완료 - Notion 링크 표시 */}
+            {/* 확정 완료 - 문서 미리보기 + Notion 링크 */}
             {docsConfirmed && (
               <div className="flex flex-col gap-3">
                 <DocumentCard
