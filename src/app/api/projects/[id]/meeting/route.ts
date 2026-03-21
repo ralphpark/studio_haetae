@@ -22,7 +22,7 @@ export async function POST(
     // Verify project belongs to user
     const { data: project } = await supabase
       .from("projects")
-      .select("id, step, company, title")
+      .select("id, step, company, project_name")
       .eq("id", id)
       .eq("user_id", user.id)
       .single();
@@ -53,7 +53,7 @@ export async function POST(
     if (method?.includes("Discord")) {
       try {
         const discord = await createProjectChannel({
-          projectName: project.title || id.slice(0, 8),
+          projectName: project.project_name || id.slice(0, 8),
           companyName: project.company || undefined,
         });
         discordChannelId = discord.channelId;
