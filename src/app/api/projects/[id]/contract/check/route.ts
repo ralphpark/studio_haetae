@@ -73,44 +73,15 @@ export async function GET(
       return NextResponse.json({ ready: false, status: "preparing" });
     }
 
-    // 계약확정 됨! Notion에서 서명 이미지 가져오기
+    // 계약확정 됨! Notion에서 대표 서명 이미지만 가져오기
+    // (원본 AI 생성 HTML은 유지 — Notion 텍스트로 덮어쓰지 않음)
     const notionData = await getContractFromNotion(project.notion_page_id);
 
     const updateData: Record<string, unknown> = {
       status: "ready",
     };
 
-    // Notion에서 수정된 계약서 텍스트가 있으면 HTML 업데이트
-    if (notionData?.contractText) {
-      // 텍스트를 HTML로 변환
-      const htmlContent = notionData.contractText
-        .split("\n")
-        .map((line) => {
-          const trimmed = line.trim();
-          if (!trimmed) return "";
-          if (trimmed.startsWith("【") && trimmed.endsWith("】")) {
-            return `<h1>${trimmed.slice(1, -1)}</h1>`;
-          }
-          if (trimmed.startsWith("■ ")) {
-            return `<h2>${trimmed.slice(2)}</h2>`;
-          }
-          if (trimmed.startsWith("▸ ")) {
-            return `<h3>${trimmed.slice(2)}</h3>`;
-          }
-          if (trimmed.startsWith("• ")) {
-            return `<li>${trimmed.slice(2)}</li>`;
-          }
-          return `<p>${trimmed}</p>`;
-        })
-        .filter(Boolean)
-        .join("\n");
-
-      if (htmlContent) {
-        updateData.contract_html = htmlContent;
-      }
-    }
-
-    // Notion에서 서명 이미지 URL
+    // Notion에서 서명 이미지 URL만 가져오기
     if (notionData?.adminSignatureUrl) {
       updateData.admin_signature_url = notionData.adminSignatureUrl;
     }
