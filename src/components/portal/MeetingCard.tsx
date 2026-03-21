@@ -161,6 +161,14 @@ export function MeetingCard({
                   Discord 메신저 참여하기
                 </a>
               )}
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <p className="text-white/50 text-sm">
+                  미팅을 완료하셨나요? 미팅 후 진행이 만족스러우셨다면 아래 버튼을 눌러 계약을 진행하세요.
+                </p>
+                <button className="mt-3 px-6 py-2.5 bg-white text-black rounded-full text-sm font-medium hover:bg-white/90 active:scale-95 transition-all">
+                  계약하기
+                </button>
+              </div>
             </div>
           </motion.div>
         ) : showForm ? (

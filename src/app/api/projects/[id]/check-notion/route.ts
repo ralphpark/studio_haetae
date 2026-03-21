@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { Client } from "@notionhq/client";
+import { Resend } from "resend";
 
 export async function GET(
   _req: Request,
@@ -70,6 +71,29 @@ export async function GET(
         })
         .eq("id", id)
         .eq("user_id", user.id);
+
+      // Send email notification
+      if (process.env.RESEND_API_KEY && user.email) {
+        try {
+          const resend = new Resend(process.env.RESEND_API_KEY);
+          await resend.emails.send({
+            from: "Studio HaeTae <hello@studiohaetae.com>",
+            to: user.email,
+            subject: "[Studio HaeTae] 기획서와 견적서가 준비되었습니다",
+            html: `<h1>기획서 & 견적서 확정 안내</h1>
+<p>안녕하세요! Studio HaeTae 비즈니스 빌더 팀입니다.</p>
+<p>요청하신 프로젝트의 <strong>기획서와 견적서</strong>가 확정되었습니다.</p>
+<p>아래 링크에서 확인하시고, 1차 미팅을 예약해주세요.</p>
+<p style="margin-top: 24px;">
+  <a href="https://haetae.studio/portal/${id}" style="background: #fff; color: #000; padding: 12px 24px; border-radius: 9999px; text-decoration: none; font-weight: 600;">포털에서 확인하기</a>
+</p>
+<hr style="margin-top: 32px; border: none; border-top: 1px solid #333;" />
+<p style="color: #888; font-size: 12px;">Studio HaeTae | Guardians of Innovation, Architects of Scale.</p>`,
+          });
+        } catch (emailErr) {
+          console.error("Email notification failed:", emailErr);
+        }
+      }
 
       return NextResponse.json({
         confirmed: true,

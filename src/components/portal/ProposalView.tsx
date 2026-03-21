@@ -507,13 +507,18 @@ export function ProposalView({
                   estimate={currentEstimate}
                   isConfirmed={true}
                 />
-                {!showMeeting && (
-                  <button
-                    onClick={() => setShowMeeting(true)}
-                    className="w-fit px-6 py-2.5 bg-white text-black rounded-full text-sm font-medium hover:bg-white/90 active:scale-95 transition-all"
-                  >
-                    1차 미팅 진행하기
-                  </button>
+                {!showMeeting && !meeting && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-white/40 text-sm">
+                      1차 미팅을 통해 기획서와 견적서의 세부 내용을 조율하고 최종 확정합니다.
+                    </p>
+                    <button
+                      onClick={() => setShowMeeting(true)}
+                      className="w-fit px-6 py-2.5 bg-white text-black rounded-full text-sm font-medium hover:bg-white/90 active:scale-95 transition-all"
+                    >
+                      1차 미팅 진행하기
+                    </button>
+                  </div>
                 )}
               </motion.div>
             )}
