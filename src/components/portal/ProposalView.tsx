@@ -312,6 +312,8 @@ export function ProposalView({
   notionPublicUrl?: string | null;
 }) {
   const [proposal, setProposal] = useState<Proposal | null>(initialProposal);
+  const [currentPlanningDoc, setCurrentPlanningDoc] = useState(planningDoc || null);
+  const [currentEstimate, setCurrentEstimate] = useState(estimate || null);
   const [currentStep, setCurrentStep] = useState(step);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -319,7 +321,6 @@ export function ProposalView({
   const [docsRequested, setDocsRequested] = useState(initialDocsRequested ?? false);
   const [isRequesting, setIsRequesting] = useState(false);
   const [docsConfirmed, setDocsConfirmed] = useState(initialDocsConfirmed ?? false);
-  const [notionUrl, setNotionUrl] = useState(initialNotionUrl || "");
   const [showMeeting, setShowMeeting] = useState(false);
 
   const handleProposalClick = async () => {
@@ -363,7 +364,8 @@ export function ProposalView({
       const data = await res.json();
       if (data.confirmed) {
         setDocsConfirmed(true);
-        setNotionUrl(data.notionUrl || "");
+        if (data.planningDoc) setCurrentPlanningDoc(data.planningDoc);
+        if (data.estimate) setCurrentEstimate(data.estimate);
         setCurrentStep(3);
         return true; // stop polling
       }
@@ -501,8 +503,8 @@ export function ProposalView({
               >
                 <DocumentCard
                   documentUrls={null}
-                  planningDoc={planningDoc}
-                  estimate={estimate}
+                  planningDoc={currentPlanningDoc}
+                  estimate={currentEstimate}
                   isConfirmed={true}
                 />
                 {!showMeeting && (

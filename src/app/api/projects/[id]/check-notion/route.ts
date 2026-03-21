@@ -18,7 +18,7 @@ export async function GET(
 
     const { data: project } = await supabase
       .from("projects")
-      .select("notion_page_id, docs_confirmed, notion_public_url, document_urls")
+      .select("notion_page_id, docs_confirmed, notion_public_url, document_urls, planning_doc, estimate")
       .eq("id", id)
       .eq("user_id", user.id)
       .single();
@@ -31,8 +31,8 @@ export async function GET(
     if (project.docs_confirmed) {
       return NextResponse.json({
         confirmed: true,
-        notionUrl: project.notion_public_url,
-        documentUrls: project.document_urls,
+        planningDoc: project.planning_doc,
+        estimate: project.estimate,
       });
     }
 
@@ -71,7 +71,11 @@ export async function GET(
         .eq("id", id)
         .eq("user_id", user.id);
 
-      return NextResponse.json({ confirmed: true, notionUrl, documentUrls: project.document_urls });
+      return NextResponse.json({
+        confirmed: true,
+        planningDoc: project.planning_doc,
+        estimate: project.estimate,
+      });
     }
 
     return NextResponse.json({ confirmed: false });
