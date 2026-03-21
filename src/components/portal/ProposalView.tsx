@@ -97,7 +97,7 @@ interface PlanningDoc {
 
 interface Estimate {
   title: string;
-  items: { name: string; price: string; note: string }[];
+  items: { name: string; hours?: string; price: string; note: string }[];
   total: string;
 }
 
@@ -239,6 +239,7 @@ function DocumentCard({
                     <thead>
                       <tr className="border-b border-white/10">
                         <th className="text-left py-2 text-white/40 font-medium">항목</th>
+                        <th className="text-right py-2 text-white/40 font-medium">공수</th>
                         <th className="text-right py-2 text-white/40 font-medium">비용</th>
                         <th className="text-left py-2 pl-4 text-white/40 font-medium">비고</th>
                       </tr>
@@ -247,6 +248,7 @@ function DocumentCard({
                       {estimate.items.map((item, i) => (
                         <tr key={i} className="border-b border-white/5">
                           <td className="py-2 text-white/70">{item.name}</td>
+                          <td className="py-2 text-right text-white/60 font-mono text-xs">{item.hours || ""}</td>
                           <td className="py-2 text-right text-white/80 font-mono">{item.price}</td>
                           <td className="py-2 pl-4 text-white/40">{item.note}</td>
                         </tr>
@@ -255,6 +257,7 @@ function DocumentCard({
                     <tfoot>
                       <tr className="border-t border-white/20">
                         <td className="py-3 font-bold">합계</td>
+                        <td></td>
                         <td className="py-3 text-right font-bold font-mono text-white">
                           {estimate.total}
                         </td>
