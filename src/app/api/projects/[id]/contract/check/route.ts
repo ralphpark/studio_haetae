@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { Client } from "@notionhq/client";
 import { getContractFromNotion } from "@/utils/notion";
+import { Resend } from "resend";
 
 export async function GET(
   _req: Request,
@@ -118,6 +119,36 @@ export async function GET(
       .from("contracts")
       .update(updateData)
       .eq("id", contract.id);
+
+    // Send notification email
+    if (process.env.RESEND_API_KEY && user.email) {
+      try {
+        const { data: proj } = await supabase
+          .from("projects")
+          .select("project_name, company")
+          .eq("id", id)
+          .single();
+
+        const projName = proj?.project_name || proj?.company || "프로젝트";
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        await resend.emails.send({
+          from: "Studio HaeTae <hello@haetae.studio>",
+          to: user.email,
+          subject: `[Studio HaeTae] ${projName} 계약서가 준비되었습니다`,
+          html: `<h1>계약서 준비 완료</h1>
+<p>안녕하세요! Studio HaeTae 비즈니스 빌더 팀입니다.</p>
+<p><strong>${projName}</strong> 프로젝트의 계약서가 준비되었습니다.</p>
+<p>포털에서 계약서 내용을 확인하시고, 서명을 진행해주세요.</p>
+<p style="margin-top: 24px;">
+  <a href="https://haetae.studio/portal/${id}" style="background: #fff; color: #000; padding: 12px 24px; border-radius: 9999px; text-decoration: none; font-weight: 600;">계약서 확인하고 서명하기</a>
+</p>
+<hr style="margin-top: 32px; border: none; border-top: 1px solid #333;" />
+<p style="color: #888; font-size: 12px;">Studio HaeTae | Guardians of Innovation, Architects of Scale.</p>`,
+        });
+      } catch (emailErr) {
+        console.error("Contract ready email failed:", emailErr);
+      }
+    }
 
     // Refetch updated contract
     const { data: updatedContract } = await supabase
