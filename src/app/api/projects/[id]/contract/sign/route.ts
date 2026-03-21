@@ -159,18 +159,22 @@ export async function POST(
       .eq("user_id", user.id);
   }
 
-  // Generate signed PDF and send email (background)
-  generateSignedPdfAndEmail({
-    contractHtml: contract.contract_html || "",
-    adminSignatureUrl: contract.admin_signature_url,
-    clientSignatureData: signature_data,
-    signerName: signer_name || "고객",
-    userEmail: user.email || "",
-    projectName: project?.project_name || project?.company || "프로젝트",
-    signedAt: now,
-    contractId: contract.id,
-    supabase,
-  }).catch((err) => console.error("[CONTRACT] PDF/Email error:", err));
+  // Generate signed PDF and send email (must await before response on Vercel)
+  try {
+    await generateSignedPdfAndEmail({
+      contractHtml: contract.contract_html || "",
+      adminSignatureUrl: contract.admin_signature_url,
+      clientSignatureData: signature_data,
+      signerName: signer_name || "고객",
+      userEmail: user.email || "",
+      projectName: project?.project_name || project?.company || "프로젝트",
+      signedAt: now,
+      contractId: contract.id,
+      supabase,
+    });
+  } catch (err) {
+    console.error("[CONTRACT] PDF/Email error:", err);
+  }
 
   return NextResponse.json({
     success: true,
