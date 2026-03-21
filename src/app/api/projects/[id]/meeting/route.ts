@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createMeetEvent } from "@/utils/google-calendar";
+import { createProjectChannel } from "@/utils/discord";
 
 export async function POST(
   req: Request,
@@ -21,7 +22,7 @@ export async function POST(
     // Verify project belongs to user
     const { data: project } = await supabase
       .from("projects")
-      .select("id, step, company")
+      .select("id, step, company, title")
       .eq("id", id)
       .eq("user_id", user.id)
       .single();
@@ -46,6 +47,20 @@ export async function POST(
       }
     }
 
+    // Create Discord channel
+    let discordChannelId: string | null = null;
+    let discordInvite: string | null = null;
+    try {
+      const discord = await createProjectChannel({
+        projectName: project.title || id.slice(0, 8),
+        companyName: project.company || undefined,
+      });
+      discordChannelId = discord.channelId;
+      discordInvite = discord.inviteLink;
+    } catch (e) {
+      console.error("Discord channel creation failed:", e);
+    }
+
     // Create meeting
     const { error: insertError } = await supabase.from("meetings").insert({
       project_id: id,
@@ -56,6 +71,8 @@ export async function POST(
       contact_phone,
       memo: memo || null,
       meet_link: meetLink,
+      discord_channel_id: discordChannelId,
+      discord_invite: discordInvite,
     });
 
     if (insertError) {
@@ -71,7 +88,11 @@ export async function POST(
         .eq("user_id", user.id);
     }
 
-    return NextResponse.json({ success: true, meet_link: meetLink });
+    return NextResponse.json({
+      success: true,
+      meet_link: meetLink,
+      discord_invite: discordInvite,
+    });
   } catch (error) {
     console.error("Meeting API error:", error);
     return NextResponse.json(

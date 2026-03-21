@@ -34,7 +34,7 @@ export default async function ProjectDetailPage({
   // Fetch meeting if exists
   const { data: meetings } = await supabase
     .from("meetings")
-    .select("preferred_date, preferred_time, method, contact_phone, status, meet_link")
+    .select("preferred_date, preferred_time, method, contact_phone, status, meet_link, discord_invite")
     .eq("project_id", id)
     .order("created_at", { ascending: false })
     .limit(1);
