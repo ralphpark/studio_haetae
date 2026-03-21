@@ -499,29 +499,12 @@ export function ProposalView({
                 animate={{ opacity: 1, y: 0 }}
                 className="flex flex-col gap-3"
               >
-                <div className="bg-white/5 border border-white/10 rounded-xl p-5 flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/70 text-sm">상세 기획서</span>
-                    {notionUrl ? (
-                      <a href={notionUrl} target="_blank" rel="noopener noreferrer" className="text-accent text-sm hover:underline">
-                        문서 보기 →
-                      </a>
-                    ) : (
-                      <span className="text-green-400 text-sm">완료</span>
-                    )}
-                  </div>
-                  <div className="w-full h-px bg-white/5" />
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/70 text-sm">견적서</span>
-                    {notionUrl ? (
-                      <a href={notionUrl} target="_blank" rel="noopener noreferrer" className="text-accent text-sm hover:underline">
-                        문서 보기 →
-                      </a>
-                    ) : (
-                      <span className="text-green-400 text-sm">완료</span>
-                    )}
-                  </div>
-                </div>
+                <DocumentCard
+                  documentUrls={null}
+                  planningDoc={planningDoc}
+                  estimate={estimate}
+                  isConfirmed={true}
+                />
                 {!showMeeting && (
                   <button
                     onClick={() => setShowMeeting(true)}
