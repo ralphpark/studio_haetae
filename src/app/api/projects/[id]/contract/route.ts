@@ -162,9 +162,8 @@ async function generateContractDraft(
 
 ## 갑 정보
 - 상호: Studio HaeTae
-- 대표: 박진우
-- 사업자등록번호: (추후 기재)
-- 주소: (추후 기재)
+- 대표: 박근수
+- 사업자등록번호: 620-180707-491
 
 ## 을 정보
 - 상호: ${project.company}
