@@ -289,50 +289,12 @@ export async function createContractNotionPage(
   if (!notion || !notionPageId) return null;
 
   try {
-    // HTML을 텍스트 블록들로 변환 (간단하게 태그 제거 후 문단 분리)
-    const textContent = contractHtml
-      .replace(/<h1[^>]*>(.*?)<\/h1>/gi, "【$1】\n\n")
-      .replace(/<h2[^>]*>(.*?)<\/h2>/gi, "\n■ $1\n")
-      .replace(/<h3[^>]*>(.*?)<\/h3>/gi, "\n▸ $1\n")
-      .replace(/<li[^>]*>(.*?)<\/li>/gi, "• $1\n")
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n")
-      .replace(/<td[^>]*>(.*?)<\/td>/gi, "$1 | ")
-      .replace(/<tr[^>]*>/gi, "\n")
-      .replace(/<strong[^>]*>(.*?)<\/strong>/gi, "$1")
-      .replace(/<[^>]+>/g, "")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const children: any[] = [];
 
-    // Notion 블록은 2000자 제한이 있으므로 분할
-    const chunks: string[] = [];
-    const lines = textContent.split("\n");
-    let current = "";
-    for (const line of lines) {
-      if ((current + "\n" + line).length > 1900) {
-        chunks.push(current.trim());
-        current = line;
-      } else {
-        current += (current ? "\n" : "") + line;
-      }
-    }
-    if (current.trim()) chunks.push(current.trim());
-
-    const children: Parameters<typeof notion.pages.create>[0]["children"] = [];
-
-    for (const chunk of chunks) {
-      children.push({
-        object: "block",
-        type: "paragraph",
-        paragraph: {
-          rich_text: [{ text: { content: chunk } }],
-        },
-      });
-    }
+    // HTML을 Notion 블록으로 파싱
+    const htmlBlocks = parseHtmlToNotionBlocks(contractHtml);
+    children.push(...htmlBlocks);
 
     // 대표 서명 영역 안내
     children.push(
@@ -476,6 +438,189 @@ function tableRow(key: string, value: string) {
         [{ text: { content: key } }],
         [{ text: { content: value } }],
       ],
+    },
+  };
+}
+
+function stripTags(html: string): string {
+  return html
+    .replace(/<strong[^>]*>(.*?)<\/strong>/gi, "$1")
+    .replace(/<em[^>]*>(.*?)<\/em>/gi, "$1")
+    .replace(/<b[^>]*>(.*?)<\/b>/gi, "$1")
+    .replace(/<i[^>]*>(.*?)<\/i>/gi, "$1")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+}
+
+type NotionBlock = {
+  object: "block";
+  type: string;
+  [key: string]: unknown;
+};
+
+function parseHtmlToNotionBlocks(html: string): NotionBlock[] {
+  const blocks: NotionBlock[] = [];
+
+  // 테이블을 먼저 추출하여 플레이스홀더로 치환
+  const tables: string[] = [];
+  const htmlWithPlaceholders = html.replace(
+    /<table[^>]*>([\s\S]*?)<\/table>/gi,
+    (_match, tableContent) => {
+      tables.push(tableContent);
+      return `__TABLE_${tables.length - 1}__`;
+    }
+  );
+
+  // 리스트 블록 추출
+  const listBlocks: string[] = [];
+  const htmlWithoutLists = htmlWithPlaceholders.replace(
+    /<[ou]l[^>]*>([\s\S]*?)<\/[ou]l>/gi,
+    (_match, listContent) => {
+      listBlocks.push(listContent);
+      return `__LIST_${listBlocks.length - 1}__`;
+    }
+  );
+
+  // 블록 단위로 분리 (h1, h2, h3, p, div, br 등)
+  const blockPattern = /<(h1|h2|h3|p|div)[^>]*>([\s\S]*?)<\/\1>|__TABLE_(\d+)__|__LIST_(\d+)__|([^<]+)/gi;
+  let match;
+
+  while ((match = blockPattern.exec(htmlWithoutLists)) !== null) {
+    const tag = match[1]?.toLowerCase();
+    const content = match[2];
+    const tableIdx = match[3];
+    const listIdx = match[4];
+    const plainText = match[5];
+
+    // 테이블 플레이스홀더
+    if (tableIdx !== undefined) {
+      const tableHtml = tables[parseInt(tableIdx)];
+      const tableBlock = parseHtmlTable(tableHtml);
+      if (tableBlock) blocks.push(tableBlock);
+      continue;
+    }
+
+    // 리스트 플레이스홀더
+    if (listIdx !== undefined) {
+      const listHtml = listBlocks[parseInt(listIdx)];
+      const items = [...listHtml.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)];
+      for (const item of items) {
+        const text = stripTags(item[1]).slice(0, 2000);
+        if (text) {
+          blocks.push({
+            object: "block",
+            type: "bulleted_list_item",
+            bulleted_list_item: {
+              rich_text: [{ text: { content: text } }],
+            },
+          });
+        }
+      }
+      continue;
+    }
+
+    if (tag === "h1") {
+      const text = stripTags(content).slice(0, 2000);
+      if (text) {
+        blocks.push({
+          object: "block",
+          type: "heading_1",
+          heading_1: { rich_text: [{ text: { content: text } }] },
+        });
+      }
+    } else if (tag === "h2") {
+      const text = stripTags(content).slice(0, 2000);
+      if (text) {
+        blocks.push({
+          object: "block",
+          type: "heading_2",
+          heading_2: { rich_text: [{ text: { content: text } }] },
+        });
+      }
+    } else if (tag === "h3") {
+      const text = stripTags(content).slice(0, 2000);
+      if (text) {
+        blocks.push({
+          object: "block",
+          type: "heading_3",
+          heading_3: { rich_text: [{ text: { content: text } }] },
+        });
+      }
+    } else if (tag === "p" || tag === "div") {
+      const text = stripTags(content).slice(0, 2000);
+      if (text) {
+        blocks.push({
+          object: "block",
+          type: "paragraph",
+          paragraph: {
+            rich_text: [{ text: { content: text } }],
+          },
+        });
+      }
+    } else if (plainText) {
+      const text = plainText.trim();
+      if (text && text.length > 1) {
+        blocks.push({
+          object: "block",
+          type: "paragraph",
+          paragraph: {
+            rich_text: [{ text: { content: text.slice(0, 2000) } }],
+          },
+        });
+      }
+    }
+  }
+
+  return blocks;
+}
+
+function parseHtmlTable(tableHtml: string): NotionBlock | null {
+  const rows: string[][] = [];
+  const rowMatches = [...tableHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
+
+  for (const rowMatch of rowMatches) {
+    const cells: string[] = [];
+    const cellMatches = [
+      ...rowMatch[1].matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi),
+    ];
+    for (const cellMatch of cellMatches) {
+      cells.push(stripTags(cellMatch[1]));
+    }
+    if (cells.length > 0) {
+      rows.push(cells);
+    }
+  }
+
+  if (rows.length === 0) return null;
+
+  // Notion 테이블 최대 열 수 결정
+  const maxCols = Math.max(...rows.map((r) => r.length));
+
+  // 각 row의 열 수를 맞춤
+  const normalizedRows = rows.map((row) => {
+    while (row.length < maxCols) row.push("");
+    return row;
+  });
+
+  return {
+    object: "block",
+    type: "table",
+    table: {
+      table_width: maxCols,
+      has_column_header: true,
+      children: normalizedRows.map((row) => ({
+        object: "block" as const,
+        type: "table_row" as const,
+        table_row: {
+          cells: row.map((cell) => [{ text: { content: cell.slice(0, 2000) } }]),
+        },
+      })),
     },
   };
 }
