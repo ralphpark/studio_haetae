@@ -450,6 +450,7 @@ export function ProposalView({
             <h3 className="text-lg font-bold">제안서</h3>
             <p className="text-white/50 text-sm mt-1">
               상담 내용을 기반으로 Studio HaeTae의 제안서를 확인해보세요.
+              {!proposal && " 잠시만 기다리시면 바로 제안서를 확인하실 수 있습니다."}
             </p>
           </div>
         </div>
@@ -467,7 +468,15 @@ export function ProposalView({
                   : "bg-white/10 border border-white/10 text-white hover:bg-white/20"
               }`}
             >
-              {isGenerating ? "확인 중..." : "제안서 확인하기"}
+              {isGenerating ? (
+                <>
+                  <svg className="inline-block w-4 h-4 mr-2 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  제안서 생성 중...
+                </>
+              ) : proposal ? "제안서 확인하기" : "제안서 생성하기"}
             </button>
           </div>
         </div>
