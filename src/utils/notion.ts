@@ -44,6 +44,12 @@ export async function createNotionProjectPage(data: ProjectData): Promise<string
     return null;
   }
 
+  const dbId = getDatabaseId();
+  if (!dbId) {
+    console.error("[NOTION] Skipped: NOTION_PROJECTS_DB_ID is not set");
+    return null;
+  }
+
   try {
     const page = await notion.pages.create({
       parent: { database_id: getDatabaseId() },
@@ -98,8 +104,9 @@ export async function createNotionProjectPage(data: ProjectData): Promise<string
     });
 
     return page.id;
-  } catch (error) {
-    console.error("[NOTION] Page creation error:", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error("[NOTION] Page creation error:", errMsg, "DB ID:", dbId.slice(0, 8) + "...");
     return null;
   }
 }

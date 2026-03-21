@@ -48,6 +48,10 @@ export async function POST(req: Request) {
         clientName: name,
       });
 
+      if (!notionPageId) {
+        console.warn("[CONTACT] Notion page creation failed for:", company, "user:", user.id);
+      }
+
       const { error: insertError } = await supabase.from("projects").insert({
         user_id: user.id,
         project_number: projectNumber,
