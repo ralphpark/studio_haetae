@@ -54,3 +54,47 @@ export async function createMeetEvent({
     eventId: event.data.id || null,
   };
 }
+
+export async function getBusySlots(date: string): Promise<string[]> {
+  const auth = getAuth();
+  const calendar = google.calendar({ version: "v3", auth });
+
+  const timeMin = `${date}T00:00:00+09:00`;
+  const timeMax = `${date}T23:59:59+09:00`;
+
+  const res = await calendar.freebusy.query({
+    requestBody: {
+      timeMin,
+      timeMax,
+      timeZone: "Asia/Seoul",
+      items: [{ id: process.env.GOOGLE_CALENDAR_ID! }],
+    },
+  });
+
+  const busyPeriods =
+    res.data.calendars?.[process.env.GOOGLE_CALENDAR_ID!]?.busy || [];
+
+  const slots = [
+    "10:00", "11:00", "12:00", "13:00",
+    "14:00", "15:00", "16:00", "17:00",
+  ];
+
+  const busySlots: string[] = [];
+
+  for (const slot of slots) {
+    const [h] = slot.split(":");
+    const slotStart = new Date(`${date}T${h}:00:00+09:00`);
+    const slotEnd = new Date(`${date}T${String(Number(h) + 1).padStart(2, "0")}:00:00+09:00`);
+
+    for (const period of busyPeriods) {
+      const busyStart = new Date(period.start!);
+      const busyEnd = new Date(period.end!);
+      if (slotStart < busyEnd && slotEnd > busyStart) {
+        busySlots.push(slot);
+        break;
+      }
+    }
+  }
+
+  return busySlots;
+}

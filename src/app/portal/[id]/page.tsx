@@ -41,6 +41,17 @@ export default async function ProjectDetailPage({
 
   const meeting = meetings?.[0] || null;
 
+  // Fetch contract if exists
+  const { data: contracts } = await supabase
+    .from("contracts")
+    .select("id, status, contract_html, admin_signature_url, client_signature_url, signed_at")
+    .eq("project_id", id)
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const contract = contracts?.[0] || null;
+
   return (
     <div className="w-full max-w-5xl mx-auto px-6 py-24 flex flex-col gap-8">
       {/* Back + Header */}
@@ -87,6 +98,7 @@ export default async function ProjectDetailPage({
         docsRequested={project.docs_requested ?? false}
         docsConfirmed={project.docs_confirmed ?? false}
         notionPublicUrl={project.notion_public_url}
+        contract={contract}
       />
     </div>
   );

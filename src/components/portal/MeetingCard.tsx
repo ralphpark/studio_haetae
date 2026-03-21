@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface MeetingData {
@@ -12,10 +12,8 @@ interface MeetingData {
 }
 
 const TIME_SLOTS = [
-  "10:00", "10:30", "11:00", "11:30",
-  "13:00", "13:30", "14:00", "14:30",
-  "15:00", "15:30", "16:00", "16:30",
-  "17:00",
+  "10:00", "11:00", "12:00", "13:00",
+  "14:00", "15:00", "16:00", "17:00",
 ];
 
 const METHODS = ["화상 미팅 (Google Meet)", "전화 미팅", "메신저 미팅 (Discord)"];
@@ -24,6 +22,7 @@ export function MeetingCard({
   projectId,
   existingMeeting,
   onBooked,
+  onContractClick,
 }: {
   projectId: string;
   existingMeeting?: {
@@ -36,11 +35,14 @@ export function MeetingCard({
     discord_invite?: string | null;
   } | null;
   onBooked?: () => void;
+  onContractClick?: () => void;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBooked, setIsBooked] = useState(!!existingMeeting);
   const [bookedData, setBookedData] = useState(existingMeeting);
+  const [busySlots, setBusySlots] = useState<string[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   const [form, setForm] = useState<MeetingData>({
     preferred_date: "",
@@ -49,6 +51,35 @@ export function MeetingCard({
     contact_phone: "",
     memo: "",
   });
+
+  // Fetch busy slots when date changes
+  useEffect(() => {
+    if (!form.preferred_date) {
+      setBusySlots([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingSlots(true);
+    setBusySlots([]);
+    setForm((p) => ({ ...p, preferred_time: "" }));
+
+    fetch(`/api/calendar/busy?date=${form.preferred_date}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) {
+          setBusySlots(data.busySlots || []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setBusySlots([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSlots(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [form.preferred_date]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,7 +196,10 @@ export function MeetingCard({
                 <p className="text-white/50 text-sm">
                   미팅을 완료하셨나요? 미팅 후 진행이 만족스러우셨다면 아래 버튼을 눌러 계약을 진행하세요.
                 </p>
-                <button className="mt-3 px-6 py-2.5 bg-white text-black rounded-full text-sm font-medium hover:bg-white/90 active:scale-95 transition-all">
+                <button
+                  onClick={onContractClick}
+                  className="mt-3 px-6 py-2.5 bg-white text-black rounded-full text-sm font-medium hover:bg-white/90 active:scale-95 transition-all"
+                >
                   계약하기
                 </button>
               </div>
@@ -180,36 +214,61 @@ export function MeetingCard({
             onSubmit={handleSubmit}
             className="ml-0 sm:ml-12 mt-4 flex flex-col gap-4"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-white/60">
-                  희망 날짜 <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="date"
-                  required
-                  min={minDate}
-                  value={form.preferred_date}
-                  onChange={(e) => setForm((p) => ({ ...p, preferred_date: e.target.value }))}
-                  className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-white/30 text-white text-sm"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-white/60">
-                  희망 시간 <span className="text-red-400">*</span>
-                </label>
-                <select
-                  required
-                  value={form.preferred_time}
-                  onChange={(e) => setForm((p) => ({ ...p, preferred_time: e.target.value }))}
-                  className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-white/30 text-white text-sm"
-                >
-                  <option value="" disabled>시간 선택</option>
-                  {TIME_SLOTS.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-white/60">
+                희망 날짜 <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="date"
+                required
+                min={minDate}
+                value={form.preferred_date}
+                onChange={(e) => setForm((p) => ({ ...p, preferred_date: e.target.value }))}
+                className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-white/30 text-white text-sm w-full sm:w-1/2"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-white/60">
+                희망 시간 <span className="text-red-400">*</span>
+              </label>
+              {!form.preferred_date ? (
+                <p className="text-white/30 text-sm">날짜를 먼저 선택해주세요.</p>
+              ) : loadingSlots ? (
+                <p className="text-white/30 text-sm">예약 가능 시간 확인 중...</p>
+              ) : (
+                <div className="grid grid-cols-4 gap-2">
+                  {TIME_SLOTS.map((slot) => {
+                    const isBusy = busySlots.includes(slot);
+                    const isSelected = form.preferred_time === slot;
+                    const [h] = slot.split(":");
+                    const endH = String(Number(h) + 1).padStart(2, "0");
+
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => setForm((p) => ({ ...p, preferred_time: slot }))}
+                        className={`py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                          isBusy
+                            ? "bg-white/[0.02] text-white/20 border-white/5 cursor-not-allowed line-through"
+                            : isSelected
+                            ? "bg-white text-black border-white"
+                            : "bg-white/5 text-white/70 border-white/10 hover:border-white/30 hover:bg-white/10"
+                        }`}
+                      >
+                        <span className="block text-xs">{slot}~{endH}:00</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {form.preferred_date && !loadingSlots && busySlots.length > 0 && (
+                <p className="text-white/30 text-xs mt-1">
+                  취소선이 있는 시간은 다른 일정이 있어 선택할 수 없습니다.
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ProposalModal } from "./ProposalModal";
 import { MeetingCard } from "./MeetingCard";
+import { ContractCard } from "./ContractCard";
 
 interface ProposalSection {
   id: string;
@@ -34,6 +35,15 @@ interface Meeting {
   method: string;
   contact_phone: string;
   status: string;
+}
+
+interface ContractData {
+  id: string;
+  status: string;
+  contract_html?: string | null;
+  admin_signature_url?: string | null;
+  client_signature_url?: string | null;
+  signed_at?: string | null;
 }
 
 function ConsultationCard({ data }: { data: ConsultationSummary }) {
@@ -298,6 +308,7 @@ export function ProposalView({
   docsRequested: initialDocsRequested,
   docsConfirmed: initialDocsConfirmed,
   notionPublicUrl: initialNotionUrl,
+  contract,
 }: {
   projectId: string;
   initialProposal: Proposal | null;
@@ -310,6 +321,7 @@ export function ProposalView({
   docsRequested?: boolean;
   docsConfirmed?: boolean;
   notionPublicUrl?: string | null;
+  contract?: ContractData | null;
 }) {
   const [proposal, setProposal] = useState<Proposal | null>(initialProposal);
   const [currentPlanningDoc, setCurrentPlanningDoc] = useState(planningDoc || null);
@@ -322,6 +334,7 @@ export function ProposalView({
   const [isRequesting, setIsRequesting] = useState(false);
   const [docsConfirmed, setDocsConfirmed] = useState(initialDocsConfirmed ?? false);
   const [showMeeting, setShowMeeting] = useState(false);
+  const [showContract, setShowContract] = useState(!!contract);
 
   const handleProposalClick = async () => {
     // Already generated — just open modal
@@ -532,11 +545,23 @@ export function ProposalView({
           projectId={projectId}
           existingMeeting={meeting}
           onBooked={handleMeetingBooked}
+          onContractClick={() => setShowContract(true)}
         />
       )}
 
-      {/* Step 5: 킥오프 (미팅 예약 후 표시) */}
-      {currentStep >= 5 && <KickoffCard />}
+      {/* Step 4: 계약 (계약하기 클릭 후 표시) */}
+      {showContract && (
+        <ContractCard
+          projectId={projectId}
+          existingContract={contract}
+          onSigned={() => {
+            if (currentStep < 6) setCurrentStep(6);
+          }}
+        />
+      )}
+
+      {/* Step 6: 킥오프 (계약 완료 후 표시) */}
+      {currentStep >= 6 && <KickoffCard />}
 
       {/* Proposal Modal */}
       <AnimatePresence>

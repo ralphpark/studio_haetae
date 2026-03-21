@@ -25,6 +25,16 @@ export default async function AdminProjectPage({
     .eq("project_id", id)
     .order("created_at", { ascending: false });
 
+  // Fetch contract
+  const { data: contractArr } = await supabase
+    .from("contracts")
+    .select("id, status")
+    .eq("project_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const contract = contractArr?.[0] || null;
+
   const features = Array.isArray(project.features)
     ? project.features.join(", ")
     : "";
@@ -105,6 +115,7 @@ export default async function AdminProjectPage({
         step={project.step}
         notionPageId={project.notion_page_id}
         documentUrls={project.document_urls}
+        contractStatus={contract?.status || null}
       />
     </div>
   );
