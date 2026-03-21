@@ -358,6 +358,163 @@ export async function createContractNotionPage(
 }
 
 /**
+ * 수정완료 체크 시: Notion에서 기획서/견적서 하위 페이지를 읽어와 JSON으로 변환
+ */
+export async function getDocsFromNotion(
+  notionPageId: string
+): Promise<{
+  planningDoc: { title: string; sections: { title: string; content: string }[] } | null;
+  estimate: { title: string; items: { name: string; hours?: string; price: string; note: string }[]; total: string } | null;
+} | null> {
+  const notion = getNotionClient();
+  if (!notion || !notionPageId) return null;
+
+  try {
+    const children = await notion.blocks.children.list({
+      block_id: notionPageId,
+      page_size: 100,
+    });
+
+    let planningPageId: string | null = null;
+    let estimatePageId: string | null = null;
+    let planningTitle = "";
+    let estimateTitle = "";
+
+    for (const block of children.results) {
+      if ("type" in block && block.type === "child_page") {
+        const title = (block as { child_page: { title: string } }).child_page.title;
+        if (title.startsWith("상세 기획서")) {
+          planningPageId = block.id;
+          planningTitle = title.replace(/^상세 기획서\s*-\s*/, "");
+        } else if (title.startsWith("견적서")) {
+          estimatePageId = block.id;
+          estimateTitle = title.replace(/^견적서\s*-\s*/, "");
+        }
+      }
+    }
+
+    // 기획서 읽기
+    let planningDoc: { title: string; sections: { title: string; content: string }[] } | null = null;
+    if (planningPageId) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const blocks: any[] = [];
+      let cursor: string | undefined = undefined;
+      do {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const resp: any = await notion.blocks.children.list({
+          block_id: planningPageId,
+          page_size: 100,
+          ...(cursor ? { start_cursor: cursor } : {}),
+        });
+        blocks.push(...resp.results);
+        cursor = resp.has_more ? resp.next_cursor : undefined;
+      } while (cursor);
+
+      const sections: { title: string; content: string }[] = [];
+      let currentTitle = "";
+      let currentContent = "";
+
+      for (const block of blocks) {
+        if (!("type" in block)) continue;
+
+        if (block.type === "heading_2") {
+          if (currentTitle) {
+            sections.push({ title: currentTitle, content: currentContent.trim() });
+          }
+          currentTitle = block.heading_2.rich_text.map((t: { plain_text: string }) => t.plain_text).join("");
+          currentContent = "";
+        } else if (block.type === "paragraph") {
+          const text = block.paragraph.rich_text.map((t: { plain_text: string }) => t.plain_text).join("");
+          if (text) currentContent += text + "\n";
+        } else if (block.type === "bulleted_list_item") {
+          const text = block.bulleted_list_item.rich_text.map((t: { plain_text: string }) => t.plain_text).join("");
+          if (text) currentContent += "• " + text + "\n";
+        } else if (block.type === "numbered_list_item") {
+          const text = block.numbered_list_item.rich_text.map((t: { plain_text: string }) => t.plain_text).join("");
+          if (text) currentContent += "• " + text + "\n";
+        } else if (block.type === "heading_3") {
+          const text = block.heading_3.rich_text.map((t: { plain_text: string }) => t.plain_text).join("");
+          if (text) currentContent += text + "\n";
+        }
+      }
+      if (currentTitle) {
+        sections.push({ title: currentTitle, content: currentContent.trim() });
+      }
+
+      if (sections.length > 0) {
+        planningDoc = { title: planningTitle || "상세 기획서", sections };
+      }
+    }
+
+    // 견적서 읽기
+    let estimate: { title: string; items: { name: string; hours?: string; price: string; note: string }[]; total: string } | null = null;
+    if (estimatePageId) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const blocks: any[] = [];
+      let cursor: string | undefined = undefined;
+      do {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const resp: any = await notion.blocks.children.list({
+          block_id: estimatePageId,
+          page_size: 100,
+          ...(cursor ? { start_cursor: cursor } : {}),
+        });
+        blocks.push(...resp.results);
+        cursor = resp.has_more ? resp.next_cursor : undefined;
+      } while (cursor);
+
+      const items: { name: string; hours?: string; price: string; note: string }[] = [];
+      let total = "";
+
+      for (const block of blocks) {
+        if (!("type" in block)) continue;
+
+        if (block.type === "table") {
+          // 테이블 children 읽기
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const tableChildren: any = await notion.blocks.children.list({
+            block_id: block.id,
+            page_size: 100,
+          });
+          let isHeader = true;
+          let colCount = 0;
+          for (const row of tableChildren.results) {
+            if (!("type" in row) || row.type !== "table_row") continue;
+            const cells = row.table_row.cells.map(
+              (cell: { plain_text: string }[]) => cell.map((c) => c.plain_text).join("")
+            );
+            if (isHeader) {
+              colCount = cells.length;
+              isHeader = false;
+              continue;
+            }
+            if (colCount === 4) {
+              items.push({ name: cells[0], hours: cells[1], price: cells[2], note: cells[3] });
+            } else {
+              items.push({ name: cells[0], price: cells[1], note: cells[2] || "" });
+            }
+          }
+        } else if (block.type === "heading_3") {
+          const text = block.heading_3.rich_text.map((t: { plain_text: string }) => t.plain_text).join("");
+          if (text.includes("합계")) {
+            total = text.replace(/^합계[:\s]*/i, "").trim();
+          }
+        }
+      }
+
+      if (items.length > 0) {
+        estimate = { title: estimateTitle || "견적서", items, total };
+      }
+    }
+
+    return { planningDoc, estimate };
+  } catch (error) {
+    console.error("[NOTION] Get docs error:", error);
+    return null;
+  }
+}
+
+/**
  * 계약확정 체크 시: Notion 계약서 페이지에서 이미지 블록(서명)을 찾아 반환
  */
 export async function getContractFromNotion(

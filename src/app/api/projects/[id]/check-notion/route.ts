@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { Client } from "@notionhq/client";
 import { Resend } from "resend";
+import { getDocsFromNotion } from "@/utils/notion";
 
 export async function GET(
   _req: Request,
@@ -61,14 +62,26 @@ export async function GET(
       // Get Notion public URL
       const notionUrl = page.url;
 
+      // Notion에서 수정된 기획서/견적서 내용 가져오기
+      const notionDocs = await getDocsFromNotion(project.notion_page_id);
+
+      const updateData: Record<string, unknown> = {
+        docs_confirmed: true,
+        notion_public_url: notionUrl,
+        step: 3,
+        status: "기획서 확정 완료",
+      };
+
+      if (notionDocs?.planningDoc) {
+        updateData.planning_doc = notionDocs.planningDoc;
+      }
+      if (notionDocs?.estimate) {
+        updateData.estimate = notionDocs.estimate;
+      }
+
       await supabase
         .from("projects")
-        .update({
-          docs_confirmed: true,
-          notion_public_url: notionUrl,
-          step: 3,
-          status: "기획서 확정 완료",
-        })
+        .update(updateData)
         .eq("id", id)
         .eq("user_id", user.id);
 
@@ -97,8 +110,8 @@ export async function GET(
 
       return NextResponse.json({
         confirmed: true,
-        planningDoc: project.planning_doc,
-        estimate: project.estimate,
+        planningDoc: notionDocs?.planningDoc || project.planning_doc,
+        estimate: notionDocs?.estimate || project.estimate,
       });
     }
 
