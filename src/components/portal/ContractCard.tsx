@@ -34,9 +34,9 @@ export function ContractCard({
   // Poll for contract status when preparing
   const pollContract = useCallback(async () => {
     try {
-      const res = await fetch(`/api/projects/${projectId}/contract`);
+      const res = await fetch(`/api/projects/${projectId}/contract/check`);
       const data = await res.json();
-      if (data.contract && data.contract.status !== "preparing") {
+      if (data.ready && data.contract) {
         setContract(data.contract);
         return true;
       }

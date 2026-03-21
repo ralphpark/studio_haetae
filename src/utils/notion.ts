@@ -277,6 +277,196 @@ export async function appendDocumentsToNotion(
   }
 }
 
+/**
+ * Step 4: 계약서 하위 페이지 생성 (AI 초안 + 대표 서명 이미지 영역)
+ */
+export async function createContractNotionPage(
+  notionPageId: string,
+  contractHtml: string,
+  companyName: string
+): Promise<string | null> {
+  const notion = getNotionClient();
+  if (!notion || !notionPageId) return null;
+
+  try {
+    // HTML을 텍스트 블록들로 변환 (간단하게 태그 제거 후 문단 분리)
+    const textContent = contractHtml
+      .replace(/<h1[^>]*>(.*?)<\/h1>/gi, "【$1】\n\n")
+      .replace(/<h2[^>]*>(.*?)<\/h2>/gi, "\n■ $1\n")
+      .replace(/<h3[^>]*>(.*?)<\/h3>/gi, "\n▸ $1\n")
+      .replace(/<li[^>]*>(.*?)<\/li>/gi, "• $1\n")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n")
+      .replace(/<td[^>]*>(.*?)<\/td>/gi, "$1 | ")
+      .replace(/<tr[^>]*>/gi, "\n")
+      .replace(/<strong[^>]*>(.*?)<\/strong>/gi, "$1")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+    // Notion 블록은 2000자 제한이 있으므로 분할
+    const chunks: string[] = [];
+    const lines = textContent.split("\n");
+    let current = "";
+    for (const line of lines) {
+      if ((current + "\n" + line).length > 1900) {
+        chunks.push(current.trim());
+        current = line;
+      } else {
+        current += (current ? "\n" : "") + line;
+      }
+    }
+    if (current.trim()) chunks.push(current.trim());
+
+    const children: Parameters<typeof notion.pages.create>[0]["children"] = [];
+
+    for (const chunk of chunks) {
+      children.push({
+        object: "block",
+        type: "paragraph",
+        paragraph: {
+          rich_text: [{ text: { content: chunk } }],
+        },
+      });
+    }
+
+    // 대표 서명 영역 안내
+    children.push(
+      { object: "block", type: "divider", divider: {} },
+      {
+        object: "block",
+        type: "callout",
+        callout: {
+          rich_text: [
+            {
+              text: {
+                content:
+                  "⬇️ 아래에 대표 서명 이미지를 추가해주세요.\n이미지 블록으로 서명 파일을 업로드하면 고객 계약서에 자동으로 반영됩니다.",
+              },
+            },
+          ],
+          icon: { type: "emoji", emoji: "✍️" },
+        },
+      },
+      {
+        object: "block",
+        type: "paragraph",
+        paragraph: {
+          rich_text: [{ text: { content: "[여기에 서명 이미지를 삽입하세요]" } }],
+        },
+      },
+      { object: "block", type: "divider", divider: {} },
+      {
+        object: "block",
+        type: "callout",
+        callout: {
+          rich_text: [
+            {
+              text: {
+                content:
+                  "✅ 계약서 검토가 완료되면 상위 프로젝트 페이지의 '계약확정' 체크박스를 체크해주세요.",
+              },
+            },
+          ],
+          icon: { type: "emoji", emoji: "📋" },
+        },
+      }
+    );
+
+    const page = await notion.pages.create({
+      parent: { page_id: notionPageId },
+      icon: { type: "emoji", emoji: "📝" },
+      properties: {
+        title: {
+          title: [{ text: { content: `계약서 - ${companyName}` } }],
+        },
+      },
+      children,
+    });
+
+    return page.id;
+  } catch (error) {
+    console.error("[NOTION] Create contract page error:", error);
+    return null;
+  }
+}
+
+/**
+ * 계약확정 체크 시: Notion 계약서 페이지에서 이미지 블록(서명)을 찾아 반환
+ */
+export async function getContractFromNotion(
+  notionPageId: string
+): Promise<{ contractText: string; adminSignatureUrl: string | null } | null> {
+  const notion = getNotionClient();
+  if (!notion || !notionPageId) return null;
+
+  try {
+    // 하위 페이지에서 계약서 페이지 찾기
+    const children = await notion.blocks.children.list({
+      block_id: notionPageId,
+      page_size: 100,
+    });
+
+    let contractPageId: string | null = null;
+    for (const block of children.results) {
+      if ("type" in block && block.type === "child_page") {
+        const title = (block as { child_page: { title: string } }).child_page.title;
+        if (title.startsWith("계약서")) {
+          contractPageId = block.id;
+          break;
+        }
+      }
+    }
+
+    if (!contractPageId) return null;
+
+    // 계약서 페이지의 블록들 읽기
+    const contractBlocks = await notion.blocks.children.list({
+      block_id: contractPageId,
+      page_size: 100,
+    });
+
+    let contractText = "";
+    let adminSignatureUrl: string | null = null;
+
+    for (const block of contractBlocks.results) {
+      if (!("type" in block)) continue;
+
+      if (block.type === "paragraph") {
+        const texts = (block as { paragraph: { rich_text: { plain_text: string }[] } }).paragraph.rich_text;
+        const text = texts.map((t) => t.plain_text).join("");
+        if (text !== "[여기에 서명 이미지를 삽입하세요]") {
+          contractText += text + "\n";
+        }
+      } else if (block.type === "image") {
+        const imageBlock = block as {
+          image: {
+            type: string;
+            file?: { url: string };
+            external?: { url: string };
+          };
+        };
+        const url =
+          imageBlock.image.type === "file"
+            ? imageBlock.image.file?.url
+            : imageBlock.image.external?.url;
+        if (url) {
+          adminSignatureUrl = url;
+        }
+      }
+    }
+
+    return { contractText: contractText.trim(), adminSignatureUrl };
+  } catch (error) {
+    console.error("[NOTION] Get contract error:", error);
+    return null;
+  }
+}
+
 function tableRow(key: string, value: string) {
   return {
     object: "block" as const,
