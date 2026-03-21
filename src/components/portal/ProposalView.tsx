@@ -6,6 +6,12 @@ import { ProposalModal } from "./ProposalModal";
 import { MeetingCard } from "./MeetingCard";
 import { ContractCard } from "./ContractCard";
 
+function formatCurrency(value: string): string {
+  const num = parseInt(value.replace(/[^0-9]/g, ""), 10);
+  if (isNaN(num)) return value;
+  return num.toLocaleString("ko-KR") + "원";
+}
+
 interface ProposalSection {
   id: string;
   title: string;
@@ -249,7 +255,7 @@ function DocumentCard({
                         <tr key={i} className="border-b border-white/5">
                           <td className="py-2 text-white/70">{item.name}</td>
                           <td className="py-2 text-right text-white/60 font-mono text-xs">{item.hours || ""}</td>
-                          <td className="py-2 text-right text-white/80 font-mono">{item.price}</td>
+                          <td className="py-2 text-right text-white/80 font-mono">{formatCurrency(item.price)}</td>
                           <td className="py-2 pl-4 text-white/40">{item.note}</td>
                         </tr>
                       ))}
@@ -259,7 +265,7 @@ function DocumentCard({
                         <td className="py-3 font-bold">합계</td>
                         <td></td>
                         <td className="py-3 text-right font-bold font-mono text-white">
-                          {estimate.total}
+                          {formatCurrency(estimate.total)}
                         </td>
                         <td></td>
                       </tr>
