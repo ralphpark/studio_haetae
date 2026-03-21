@@ -77,7 +77,7 @@ export async function GET(
         try {
           const resend = new Resend(process.env.RESEND_API_KEY);
           await resend.emails.send({
-            from: "Studio HaeTae <onboarding@resend.dev>",
+            from: "Studio HaeTae <hello@haetae.studio>",
             to: user.email,
             subject: "[Studio HaeTae] 기획서와 견적서가 준비되었습니다",
             html: `<h1>기획서 & 견적서 확정 안내</h1>

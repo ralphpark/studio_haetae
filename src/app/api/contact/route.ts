@@ -86,7 +86,7 @@ export async function POST(req: Request) {
     if (process.env.RESEND_API_KEY) {
       const resend = new Resend(process.env.RESEND_API_KEY);
       await resend.emails.send({
-        from: "Studio HaeTae <hello@studiohaetae.com>",
+        from: "Studio HaeTae <hello@haetae.studio>",
         to: email,
         subject: "[Studio HaeTae] 프로젝트 문의가 성공적으로 접수되었습니다.",
         html: `<h1>안녕하세요, ${name}님!</h1>
