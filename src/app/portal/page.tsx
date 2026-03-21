@@ -1,7 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import { LogoutButton } from "@/components/portal/LogoutButton";
 import { ProjectCard } from "@/components/portal/ProjectCard";
-import { Navbar } from "@/components/layout/Navbar";
 
 function EmptyState() {
   return (
@@ -47,19 +47,18 @@ export default async function PortalPage() {
   const projectList = projects || [];
 
   return (
-    <>
-      <Navbar />
-      <div className="w-full max-w-5xl mx-auto px-6 py-12 flex flex-col gap-10">
-        <header className="flex items-start justify-between">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tighter">
-              Project Dashboard
-            </h1>
-            <p className="text-white/50 text-base">
-              Welcome back, {userName}.
-            </p>
-          </div>
-        </header>
+    <div className="w-full max-w-5xl mx-auto px-6 py-24 flex flex-col gap-10">
+      <header className="flex items-start justify-between">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tighter">
+            Project Dashboard
+          </h1>
+          <p className="text-white/50 text-base">
+            Welcome back, {userName}.
+          </p>
+        </div>
+        <LogoutButton />
+      </header>
 
       {projectList.length > 0 ? (
         <section className="flex flex-col gap-6">
@@ -70,7 +69,6 @@ export default async function PortalPage() {
       ) : (
         <EmptyState />
       )}
-      </div>
-    </>
+    </div>
   );
 }
