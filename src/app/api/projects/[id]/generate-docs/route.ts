@@ -49,6 +49,11 @@ export async function POST(
       return NextResponse.json({ error: "Project or proposal not found" }, { status: 404 });
     }
 
+    // 이미 생성된 경우 중복 생성 방지
+    if (project.planning_doc && project.estimate) {
+      return NextResponse.json({ success: true, message: "Already generated" });
+    }
+
     const geminiKey = process.env.GEMINI_API_KEY;
     if (!geminiKey) {
       return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500 });
