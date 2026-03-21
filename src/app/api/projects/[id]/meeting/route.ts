@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { createMeetEvent } from "@/utils/google-calendar";
 
 export async function POST(
   req: Request,
@@ -20,13 +21,29 @@ export async function POST(
     // Verify project belongs to user
     const { data: project } = await supabase
       .from("projects")
-      .select("id, step")
+      .select("id, step, company")
       .eq("id", id)
       .eq("user_id", user.id)
       .single();
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    // Create Google Meet if method is 화상 미팅
+    let meetLink: string | null = null;
+    if (method?.includes("Google Meet")) {
+      try {
+        const result = await createMeetEvent({
+          date: preferred_date,
+          time: preferred_time,
+          title: `Studio HaeTae 1차 미팅${project.company ? ` - ${project.company}` : ""}`,
+          description: `프로젝트 미팅\n연락처: ${contact_phone}${memo ? `\n메모: ${memo}` : ""}`,
+        });
+        meetLink = result.meetLink;
+      } catch (e) {
+        console.error("Google Meet creation failed:", e);
+      }
     }
 
     // Create meeting
@@ -38,13 +55,14 @@ export async function POST(
       method,
       contact_phone,
       memo: memo || null,
+      meet_link: meetLink,
     });
 
     if (insertError) {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
-    // Advance step (미팅은 Step 3: 기획서/견적서 확정 이후에 활성화됨)
+    // Advance step
     if (project.step < 4) {
       await supabase
         .from("projects")
@@ -53,7 +71,7 @@ export async function POST(
         .eq("user_id", user.id);
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, meet_link: meetLink });
   } catch (error) {
     console.error("Meeting API error:", error);
     return NextResponse.json(
