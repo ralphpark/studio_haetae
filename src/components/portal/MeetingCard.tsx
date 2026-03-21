@@ -179,7 +179,7 @@ export function MeetingCard({
                   required
                   value={form.preferred_time}
                   onChange={(e) => setForm((p) => ({ ...p, preferred_time: e.target.value }))}
-                  className="px-4 py-2.5 bg-[#111] border border-white/10 rounded-xl outline-none focus:border-white/30 text-white text-sm"
+                  className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-white/30 text-white text-sm"
                 >
                   <option value="" disabled>시간 선택</option>
                   {TIME_SLOTS.map((t) => (
