@@ -159,7 +159,8 @@ export async function POST(
       .eq("user_id", user.id);
   }
 
-  // Generate signed PDF and send email (must await before response on Vercel)
+  // Generate signed PDF and send email
+  let pdfEmailError: string | null = null;
   try {
     await generateSignedPdfAndEmail({
       contractHtml: contract.contract_html || "",
@@ -173,13 +174,15 @@ export async function POST(
       supabase,
     });
   } catch (err) {
-    console.error("[CONTRACT] PDF/Email error:", err);
+    pdfEmailError = err instanceof Error ? err.message : String(err);
+    console.error("[CONTRACT] PDF/Email error:", pdfEmailError);
   }
 
   return NextResponse.json({
     success: true,
     signed_at: now,
     client_signature_url: urlData.publicUrl,
+    ...(pdfEmailError ? { pdf_email_error: pdfEmailError } : {}),
   });
 }
 
@@ -207,15 +210,28 @@ async function generateSignedPdfAndEmail({
   // 1. Generate PDF with Korean font
   const pdf = await PDFDocument.create();
 
-  // Fetch and embed Korean font (Noto Sans KR)
-  const fontUrl = "https://cdn.jsdelivr.net/gh/googlefonts/noto-cjk@main/Sans/Variable/OTF/Subset/NotoSansKR-VF.otf";
+  // Fetch and embed Korean font (Noto Sans KR Regular - static OTF)
+  const fontUrls = [
+    "https://cdn.jsdelivr.net/gh/googlefonts/noto-cjk@main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf",
+    "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf",
+    "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf",
+  ];
   let font;
-  try {
-    const fontRes = await fetch(fontUrl);
-    const fontBytes = new Uint8Array(await fontRes.arrayBuffer());
-    font = await pdf.embedFont(fontBytes, { subset: true });
-  } catch {
-    // Fallback to Helvetica (한글 깨질 수 있음)
+  let fontLoaded = false;
+  for (const fontUrl of fontUrls) {
+    try {
+      const fontRes = await fetch(fontUrl);
+      if (!fontRes.ok) continue;
+      const fontBytes = new Uint8Array(await fontRes.arrayBuffer());
+      font = await pdf.embedFont(fontBytes, { subset: true });
+      fontLoaded = true;
+      break;
+    } catch {
+      continue;
+    }
+  }
+  if (!fontLoaded) {
+    // Fallback: Helvetica (한글 깨짐 — 영문만 표시)
     font = await pdf.embedFont(StandardFonts.Helvetica);
   }
 
