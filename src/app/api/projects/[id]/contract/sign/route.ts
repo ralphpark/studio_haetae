@@ -212,15 +212,49 @@ async function generateSignedPdfAndEmail({
   // 1. Generate PDF with Korean font
   const pdf = await PDFDocument.create();
 
-  // Load Korean font from local file (bundled with deployment)
+  // Load Korean font — try local file first, then fetch from own domain
   let font;
-  try {
-    const fontPath = join(process.cwd(), "public", "fonts", "NotoSansKR-Subset.ttf");
-    const fontBytes = await readFile(fontPath);
-    font = await pdf.embedFont(fontBytes, { subset: true });
-  } catch (fontErr) {
-    console.error("[CONTRACT] Korean font load failed:", fontErr);
-    // Fallback: Helvetica (한글 깨짐)
+  let fontLoaded = false;
+
+  // 1차: 로컬 파일 시스템 (여러 경로 시도)
+  const fontPaths = [
+    join(process.cwd(), "public", "fonts", "NotoSansKR-Subset.ttf"),
+    join(process.cwd(), ".next", "static", "fonts", "NotoSansKR-Subset.ttf"),
+    "/var/task/public/fonts/NotoSansKR-Subset.ttf",
+  ];
+  for (const fontPath of fontPaths) {
+    try {
+      const fontBytes = await readFile(fontPath);
+      if (fontBytes.length > 1000) {
+        font = await pdf.embedFont(fontBytes, { subset: true });
+        fontLoaded = true;
+        break;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  // 2차: 자기 도메인에서 fetch
+  if (!fontLoaded) {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "https://haetae.studio";
+      const fontRes = await fetch(`${baseUrl}/fonts/NotoSansKR-Subset.ttf`);
+      if (fontRes.ok) {
+        const fontBytes = new Uint8Array(await fontRes.arrayBuffer());
+        font = await pdf.embedFont(fontBytes, { subset: true });
+        fontLoaded = true;
+      }
+    } catch (fetchErr) {
+      console.error("[CONTRACT] Font fetch failed:", fetchErr);
+    }
+  }
+
+  // 3차: Fallback
+  if (!fontLoaded) {
+    console.error("[CONTRACT] All font loading methods failed, using Helvetica");
     font = await pdf.embedFont(StandardFonts.Helvetica);
   }
 
