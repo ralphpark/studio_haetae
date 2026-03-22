@@ -354,7 +354,7 @@ export function ProposalView({
   const [isRequesting, setIsRequesting] = useState(false);
   const [docsConfirmed, setDocsConfirmed] = useState(initialDocsConfirmed ?? false);
   const [showMeeting, setShowMeeting] = useState(false);
-  const [showContract, setShowContract] = useState(!!contract);
+  const [showContract, setShowContract] = useState(!!contract || step >= 4);
 
   const handleProposalClick = async () => {
     // Already generated — just open modal
