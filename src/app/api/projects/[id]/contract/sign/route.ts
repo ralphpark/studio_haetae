@@ -220,7 +220,7 @@ async function generateSignedPdfAndEmail({
   console.log("[CONTRACT] Step 2: Decoding font base64...");
   const fontBytes = Buffer.from(KOREAN_FONT_BASE64, "base64");
   console.log("[CONTRACT] Step 3: Embedding font (size:", fontBytes.length, ")...");
-  const font = await pdf.embedFont(fontBytes, { subset: true });
+  const font = await pdf.embedFont(fontBytes);
   console.log("[CONTRACT] Step 4: Font embedded successfully");
 
   const fontSize = 10;
