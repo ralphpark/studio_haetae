@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createHash } from "crypto";
 import { PDFDocument, rgb } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
 import { Resend } from "resend";
 import { createProjectChannel } from "@/utils/discord";
 import { KOREAN_FONT_BASE64 } from "@/utils/korean-font";
@@ -210,6 +211,7 @@ async function generateSignedPdfAndEmail({
 }) {
   // 1. Generate PDF with Korean font
   const pdf = await PDFDocument.create();
+  pdf.registerFontkit(fontkit);
 
   // Load Korean font from embedded base64
   const fontBytes = Buffer.from(KOREAN_FONT_BASE64, "base64");
