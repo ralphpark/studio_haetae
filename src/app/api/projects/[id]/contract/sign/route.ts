@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createHash } from "crypto";
+import { readFile } from "fs/promises";
+import { join } from "path";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { Resend } from "resend";
 import { createProjectChannel } from "@/utils/discord";
@@ -210,28 +212,15 @@ async function generateSignedPdfAndEmail({
   // 1. Generate PDF with Korean font
   const pdf = await PDFDocument.create();
 
-  // Fetch and embed Korean font (Noto Sans KR Regular - static OTF)
-  const fontUrls = [
-    "https://cdn.jsdelivr.net/gh/googlefonts/noto-cjk@main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf",
-    "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf",
-    "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf",
-  ];
+  // Load Korean font from local file (bundled with deployment)
   let font;
-  let fontLoaded = false;
-  for (const fontUrl of fontUrls) {
-    try {
-      const fontRes = await fetch(fontUrl);
-      if (!fontRes.ok) continue;
-      const fontBytes = new Uint8Array(await fontRes.arrayBuffer());
-      font = await pdf.embedFont(fontBytes, { subset: true });
-      fontLoaded = true;
-      break;
-    } catch {
-      continue;
-    }
-  }
-  if (!fontLoaded) {
-    // Fallback: Helvetica (한글 깨짐 — 영문만 표시)
+  try {
+    const fontPath = join(process.cwd(), "public", "fonts", "NotoSansKR-Subset.ttf");
+    const fontBytes = await readFile(fontPath);
+    font = await pdf.embedFont(fontBytes, { subset: true });
+  } catch (fontErr) {
+    console.error("[CONTRACT] Korean font load failed:", fontErr);
+    // Fallback: Helvetica (한글 깨짐)
     font = await pdf.embedFont(StandardFonts.Helvetica);
   }
 
