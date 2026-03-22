@@ -29,17 +29,16 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    // Already confirmed
-    if (project.docs_confirmed) {
-      return NextResponse.json({
-        confirmed: true,
-        planningDoc: project.planning_doc,
-        estimate: project.estimate,
-      });
-    }
-
-    // Check Notion checkbox
+    // Check Notion checkbox (even if already confirmed — admin may uncheck to re-edit)
     if (!project.notion_page_id || !process.env.NOTION_API_KEY) {
+      // No Notion page → fall back to cached state
+      if (project.docs_confirmed) {
+        return NextResponse.json({
+          confirmed: true,
+          planningDoc: project.planning_doc,
+          estimate: project.estimate,
+        });
+      }
       return NextResponse.json({ confirmed: false });
     }
 
@@ -51,6 +50,13 @@ export async function GET(
 
     // Type narrow: only DatabaseObjectResponse has properties
     if (!("properties" in page)) {
+      if (project.docs_confirmed) {
+        return NextResponse.json({
+          confirmed: true,
+          planningDoc: project.planning_doc,
+          estimate: project.estimate,
+        });
+      }
       return NextResponse.json({ confirmed: false });
     }
 
@@ -58,12 +64,29 @@ export async function GET(
     const isConfirmed =
       checkboxProp?.type === "checkbox" && checkboxProp.checkbox === true;
 
+    // Checkbox unchecked but DB says confirmed → admin is re-editing, reset
+    if (!isConfirmed && project.docs_confirmed) {
+      await supabase
+        .from("projects")
+        .update({
+          docs_confirmed: false,
+          step: 2,
+          status: "기획서 수정 중",
+        })
+        .eq("id", id)
+        .eq("user_id", user.id);
+
+      return NextResponse.json({ confirmed: false, step: 2 });
+    }
+
     if (isConfirmed) {
       // Get Notion public URL
       const notionUrl = page.url;
 
-      // Notion에서 수정된 기획서/견적서 내용 가져오기
+      // Notion에서 수정된 기획서/견적서 내용 가져오기 (항상 최신 데이터 반영)
       const notionDocs = await getDocsFromNotion(project.notion_page_id);
+
+      const wasAlreadyConfirmed = project.docs_confirmed;
 
       const updateData: Record<string, unknown> = {
         docs_confirmed: true,
@@ -85,8 +108,8 @@ export async function GET(
         .eq("id", id)
         .eq("user_id", user.id);
 
-      // Send email notification
-      if (process.env.RESEND_API_KEY && user.email) {
+      // Send email notification only on first confirmation (not re-confirmations)
+      if (!wasAlreadyConfirmed && process.env.RESEND_API_KEY && user.email) {
         try {
           const resend = new Resend(process.env.RESEND_API_KEY);
           await resend.emails.send({

@@ -390,7 +390,7 @@ export function ProposalView({
     }
   };
 
-  // Notion 수정완료 polling (5초 간격)
+  // Notion 수정완료 polling (5초 간격) — 확정 후에도 계속 폴링하여 수정 감지
   const pollNotion = useCallback(async () => {
     try {
       const res = await fetch(`/api/projects/${projectId}/check-notion`);
@@ -399,23 +399,28 @@ export function ProposalView({
         setDocsConfirmed(true);
         if (data.planningDoc) setCurrentPlanningDoc(data.planningDoc);
         if (data.estimate) setCurrentEstimate(data.estimate);
-        setCurrentStep(3);
-        return true; // stop polling
+        if (currentStep < 3) setCurrentStep(3);
+      } else {
+        // Admin unchecked → reset to editing state
+        if (docsConfirmed) {
+          setDocsConfirmed(false);
+        }
+        if (data.step !== undefined && data.step < currentStep) {
+          setCurrentStep(data.step);
+        }
       }
     } catch {
       // ignore
     }
-    return false;
-  }, [projectId]);
+  }, [projectId, docsConfirmed, currentStep]);
 
   useEffect(() => {
-    if (!docsRequested || docsConfirmed) return;
-    const interval = setInterval(async () => {
-      const done = await pollNotion();
-      if (done) clearInterval(interval);
+    if (!docsRequested) return;
+    const interval = setInterval(() => {
+      pollNotion();
     }, 5000);
     return () => clearInterval(interval);
-  }, [docsRequested, docsConfirmed, pollNotion]);
+  }, [docsRequested, pollNotion]);
 
   const handleRequestDocs = async () => {
     setIsRequesting(true);
@@ -503,6 +508,8 @@ export function ProposalView({
               <p className="text-white/50 text-sm mt-1">
                 {docsConfirmed
                   ? "기획서와 견적서가 준비되었습니다."
+                  : docsRequested && (currentPlanningDoc || currentEstimate)
+                  ? "문서를 수정하고 있습니다. 수정이 완료되면 자동으로 반영됩니다."
                   : docsRequested
                   ? "Studio HaeTae에서 기획서와 견적서를 작성하고 있습니다. 작성이 완료되면 링크가 제공됩니다."
                   : "상세 기획서와 견적서를 받아보시겠습니까?"}

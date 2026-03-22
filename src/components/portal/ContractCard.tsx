@@ -32,26 +32,37 @@ export function ContractCard({
   const [signError, setSignError] = useState("");
   const sigCanvasRef = useRef<SignatureCanvas | null>(null);
 
-  // Poll for contract status when preparing
+  // Poll for contract status — continues even after ready/signed to detect admin re-edits
   const pollContract = useCallback(async () => {
     try {
       const res = await fetch(`/api/projects/${projectId}/contract/check`);
       const data = await res.json();
       if (data.ready && data.contract) {
         setContract(data.contract);
-        return true;
+        // Reset signing UI state when contract becomes ready again (re-confirmation)
+        if (data.contract.status === "ready") {
+          setConsent(false);
+          setSignerName(data.contract.client_name || "");
+          setSignError("");
+        }
+      } else if (!data.ready && data.status === "preparing") {
+        // Admin unchecked → contract reset to preparing
+        setContract((prev) =>
+          prev ? { ...prev, status: "preparing" } : prev
+        );
+        setConsent(false);
+        setSignerName("");
+        setSignError("");
       }
     } catch {
       // ignore
     }
-    return false;
   }, [projectId]);
 
   useEffect(() => {
-    if (!contract || contract.status !== "preparing") return;
-    const interval = setInterval(async () => {
-      const done = await pollContract();
-      if (done) clearInterval(interval);
+    if (!contract) return;
+    const interval = setInterval(() => {
+      pollContract();
     }, 5000);
     return () => clearInterval(interval);
   }, [contract, pollContract]);
@@ -149,6 +160,8 @@ export function ContractCard({
               ? "계약이 체결되었습니다."
               : contract?.status === "ready"
               ? "계약서가 준비되었습니다. 내용을 확인하고 서명해주세요."
+              : contract?.status === "preparing" && contract?.contract_html
+              ? "계약서를 수정하고 있습니다. 수정이 완료되면 자동으로 반영됩니다."
               : contract?.status === "preparing"
               ? "계약서를 작성하고 있습니다. 잠시만 기다려주세요."
               : "1차 미팅 후 계약서를 요청할 수 있습니다."}
