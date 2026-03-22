@@ -115,49 +115,145 @@ function ChipSelect({
   value,
   onChange,
   multiple = false,
+  allowCustom = false,
+  customPlaceholder = "직접 입력해주세요",
 }: {
   options: string[];
   value: string | string[];
   onChange: (val: string | string[]) => void;
   multiple?: boolean;
+  allowCustom?: boolean;
+  customPlaceholder?: string;
 }) {
+  const [customInput, setCustomInput] = useState("");
+  const OTHER_LABEL = "기타 (직접 입력)";
+
+  // 기타로 입력된 커스텀 값들 추출
+  const getCustomValues = () => {
+    if (!multiple) return [];
+    return (value as string[]).filter(
+      (v) => !options.includes(v) && v !== OTHER_LABEL
+    );
+  };
+
+  const isOtherSelected = multiple
+    ? (value as string[]).some((v) => !options.includes(v) && v !== OTHER_LABEL) ||
+      (value as string[]).includes(OTHER_LABEL)
+    : false;
+
   const handleClick = (option: string) => {
     if (multiple) {
       const arr = value as string[];
-      onChange(
-        arr.includes(option)
-          ? arr.filter((v) => v !== option)
-          : [...arr, option]
-      );
+      if (option === OTHER_LABEL) {
+        // "기타" 토글 — 해제 시 커스텀 값도 제거
+        if (isOtherSelected) {
+          onChange(arr.filter((v) => options.includes(v) && v !== OTHER_LABEL));
+        } else {
+          onChange([...arr, OTHER_LABEL]);
+        }
+      } else {
+        onChange(
+          arr.includes(option)
+            ? arr.filter((v) => v !== option)
+            : [...arr, option]
+        );
+      }
     } else {
       onChange(option === value ? "" : option);
     }
   };
 
+  const handleAddCustom = () => {
+    if (!customInput.trim() || !multiple) return;
+    const arr = (value as string[]).filter((v) => v !== OTHER_LABEL);
+    if (!arr.includes(customInput.trim())) {
+      onChange([...arr, customInput.trim()]);
+    }
+    setCustomInput("");
+  };
+
+  const handleRemoveCustom = (item: string) => {
+    if (!multiple) return;
+    const arr = (value as string[]).filter((v) => v !== item);
+    onChange(arr);
+  };
+
+  const allOptions = allowCustom ? [...options, OTHER_LABEL] : options;
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((option) => {
-        const isSelected = multiple
-          ? (value as string[]).includes(option)
-          : value === option;
-        return (
-          <button
-            key={option}
-            type="button"
-            onClick={() => handleClick(option)}
-            className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
-              isSelected
-                ? "bg-white text-black border-white"
-                : "bg-white/5 text-white/70 border-white/10 hover:border-white/30 hover:text-white"
-            }`}
-          >
-            {isSelected && multiple && (
-              <span className="mr-1.5">&#10003;</span>
-            )}
-            {option}
-          </button>
-        );
-      })}
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
+        {allOptions.map((option) => {
+          const isSelected =
+            option === OTHER_LABEL
+              ? isOtherSelected
+              : multiple
+              ? (value as string[]).includes(option)
+              : value === option;
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => handleClick(option)}
+              className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+                isSelected
+                  ? "bg-white text-black border-white"
+                  : "bg-white/5 text-white/70 border-white/10 hover:border-white/30 hover:text-white"
+              }`}
+            >
+              {isSelected && multiple && (
+                <span className="mr-1.5">&#10003;</span>
+              )}
+              {option}
+            </button>
+          );
+        })}
+      </div>
+      {allowCustom && isOtherSelected && (
+        <div className="flex flex-col gap-2 mt-1">
+          {getCustomValues().length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {getCustomValues().map((item) => (
+                <span
+                  key={item}
+                  className="inline-flex items-center gap-1 px-3 py-1 bg-white/10 border border-white/20 rounded-full text-xs text-white/80"
+                >
+                  {item}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveCustom(item)}
+                    className="text-white/40 hover:text-white ml-0.5"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={customInput}
+              onChange={(e) => setCustomInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddCustom();
+                }
+              }}
+              placeholder={customPlaceholder}
+              className="flex-1 px-3 py-2 bg-[#111] border border-white/10 rounded-lg text-sm text-white outline-none focus:border-white/30 transition-all"
+            />
+            <button
+              type="button"
+              onClick={handleAddCustom}
+              className="px-4 py-2 bg-white/10 border border-white/10 rounded-lg text-sm text-white/70 hover:bg-white/20 transition-all"
+            >
+              추가
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -439,6 +535,8 @@ export function ContactForm() {
                         setFormData((prev) => ({ ...prev, features: v as string[] }))
                       }
                       multiple
+                      allowCustom
+                      customPlaceholder={formData.projectType === "업무 자동화 (n8n)" ? "자동화할 업무를 입력하세요" : "필요한 기능을 입력하세요"}
                     />
                   </div>
                   <div className="flex flex-col gap-2">
