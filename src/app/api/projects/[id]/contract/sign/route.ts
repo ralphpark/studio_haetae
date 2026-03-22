@@ -7,6 +7,8 @@ import { Resend } from "resend";
 import { createProjectChannel } from "@/utils/discord";
 import { KOREAN_FONT_BASE64 } from "@/utils/korean-font";
 
+export const maxDuration = 60;
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -176,7 +178,7 @@ export async function POST(
       supabase,
     });
   } catch (err) {
-    pdfEmailError = err instanceof Error ? err.message : String(err);
+    pdfEmailError = err instanceof Error ? `${err.message}\n${err.stack}` : String(err);
     console.error("[CONTRACT] PDF/Email error:", pdfEmailError);
   }
 
@@ -210,12 +212,16 @@ async function generateSignedPdfAndEmail({
   supabase: Awaited<ReturnType<typeof createClient>>;
 }) {
   // 1. Generate PDF with Korean font
+  console.log("[CONTRACT] Step 1: Creating PDF document...");
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
 
   // Load Korean font from embedded base64
+  console.log("[CONTRACT] Step 2: Decoding font base64...");
   const fontBytes = Buffer.from(KOREAN_FONT_BASE64, "base64");
+  console.log("[CONTRACT] Step 3: Embedding font (size:", fontBytes.length, ")...");
   const font = await pdf.embedFont(fontBytes, { subset: true });
+  console.log("[CONTRACT] Step 4: Font embedded successfully");
 
   const fontSize = 10;
   const margin = 50;
@@ -357,7 +363,9 @@ async function generateSignedPdfAndEmail({
     color: rgb(0.4, 0.4, 0.4),
   });
 
+  console.log("[CONTRACT] Step 5: Saving PDF...");
   const pdfBytes = await pdf.save();
+  console.log("[CONTRACT] Step 6: PDF saved (size:", pdfBytes.length, "). Uploading...");
 
   // 2. Upload PDF to Supabase Storage
   const pdfPath = `signed/${contractId}/contract_${Date.now()}.pdf`;
@@ -384,6 +392,8 @@ async function generateSignedPdfAndEmail({
       signed_document_hash: signedHash,
     })
     .eq("id", contractId);
+
+  console.log("[CONTRACT] Step 7: PDF uploaded. Sending email...");
 
   // 3. Send email with PDF attachment
   if (process.env.RESEND_API_KEY && userEmail) {
