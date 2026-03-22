@@ -237,18 +237,25 @@ async function generateSignedPdfAndEmail({
 
   // 2차: 자기 도메인에서 fetch
   if (!fontLoaded) {
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : "https://haetae.studio";
-      const fontRes = await fetch(`${baseUrl}/fonts/NotoSansKR-Subset.ttf`);
-      if (fontRes.ok) {
-        const fontBytes = new Uint8Array(await fontRes.arrayBuffer());
-        font = await pdf.embedFont(fontBytes, { subset: true });
-        fontLoaded = true;
+    const fontUrls = [
+      "https://haetae.studio/fonts/NotoSansKR-Subset.ttf",
+      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/fonts/NotoSansKR-Subset.ttf` : "",
+    ].filter(Boolean);
+
+    for (const url of fontUrls) {
+      try {
+        const fontRes = await fetch(url);
+        if (fontRes.ok) {
+          const fontBytes = new Uint8Array(await fontRes.arrayBuffer());
+          if (fontBytes.length > 1000) {
+            font = await pdf.embedFont(fontBytes, { subset: true });
+            fontLoaded = true;
+            break;
+          }
+        }
+      } catch {
+        continue;
       }
-    } catch (fetchErr) {
-      console.error("[CONTRACT] Font fetch failed:", fetchErr);
     }
   }
 
