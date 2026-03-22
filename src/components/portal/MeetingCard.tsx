@@ -130,7 +130,7 @@ export function MeetingCard({
         <div>
           <h3 className="text-lg font-bold">1차 미팅</h3>
           <p className="text-white/50 text-sm mt-1">
-            제안서 내용을 바탕으로 상세한 논의를 진행합니다.
+            상세 기획서와 견적서를 바탕으로 상세한 논의를 진행합니다.
           </p>
         </div>
       </div>
