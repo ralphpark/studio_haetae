@@ -437,6 +437,7 @@ export function ProposalView({
 
   const handleMeetingBooked = () => {
     if (currentStep < 4) setCurrentStep(4);
+    setShowContract(true);
   };
 
   return (
