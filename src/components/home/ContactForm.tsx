@@ -45,10 +45,29 @@ const FEATURES = [
   "외부 API 연동",
 ];
 
+const AUTOMATION_FEATURES = [
+  "이메일 자동 발송",
+  "슬랙/디스코드 알림",
+  "구글시트 연동",
+  "CRM 연동 (HubSpot 등)",
+  "데이터 수집/스크래핑",
+  "정기 리포트 생성",
+  "주문/결제 알림 자동화",
+  "고객 문의 자동 분류",
+  "SNS 자동 포스팅",
+  "외부 API 연동 자동화",
+];
+
 const DESIGN_STATUSES = [
   "디자인 시안이 있어요",
   "레퍼런스/참고 사이트만 있어요",
   "디자인도 함께 의뢰할게요",
+];
+
+const AUTOMATION_DESIGN_STATUSES = [
+  "현재 수작업으로 처리 중",
+  "기존 자동화 도구가 있어요 (교체 희망)",
+  "처음부터 새로 구축할게요",
 ];
 
 const BUDGETS = [
@@ -398,18 +417,23 @@ export function ContactForm() {
               {step === 3 && (
                 <motion.div {...stepAnim} className="flex flex-col gap-5">
                   <div>
-                    <h3 className="text-2xl font-bold">3. 기능 & 디자인</h3>
+                    <h3 className="text-2xl font-bold">
+                      {formData.projectType === "업무 자동화 (n8n)" ? "3. 자동화 범위 & 현황" : "3. 기능 & 디자인"}
+                    </h3>
                     <p className="text-white/50 text-sm mt-1">
-                      필요한 기능을 모두 선택해주세요.
+                      {formData.projectType === "업무 자동화 (n8n)"
+                        ? "자동화하고 싶은 업무를 모두 선택해주세요."
+                        : "필요한 기능을 모두 선택해주세요."}
                     </p>
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-medium text-white/70">
-                      핵심 기능 <span className="text-white/40">(복수 선택)</span>{" "}
+                      {formData.projectType === "업무 자동화 (n8n)" ? "자동화 항목" : "핵심 기능"}{" "}
+                      <span className="text-white/40">(복수 선택)</span>{" "}
                       <span className="text-red-400">*</span>
                     </label>
                     <ChipSelect
-                      options={FEATURES}
+                      options={formData.projectType === "업무 자동화 (n8n)" ? AUTOMATION_FEATURES : FEATURES}
                       value={formData.features}
                       onChange={(v) =>
                         setFormData((prev) => ({ ...prev, features: v as string[] }))
@@ -419,10 +443,11 @@ export function ContactForm() {
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-medium text-white/70">
-                      디자인 현황 <span className="text-red-400">*</span>
+                      {formData.projectType === "업무 자동화 (n8n)" ? "현재 상황" : "디자인 현황"}{" "}
+                      <span className="text-red-400">*</span>
                     </label>
                     <ChipSelect
-                      options={DESIGN_STATUSES}
+                      options={formData.projectType === "업무 자동화 (n8n)" ? AUTOMATION_DESIGN_STATUSES : DESIGN_STATUSES}
                       value={formData.designStatus}
                       onChange={(v) =>
                         setFormData((prev) => ({ ...prev, designStatus: v as string }))
