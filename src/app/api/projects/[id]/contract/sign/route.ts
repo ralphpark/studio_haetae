@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createHash } from "crypto";
-import { readFile } from "fs/promises";
-import { join } from "path";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
 import { Resend } from "resend";
 import { createProjectChannel } from "@/utils/discord";
+import { KOREAN_FONT_BASE64 } from "@/utils/korean-font";
 
 export async function POST(
   req: Request,
@@ -212,58 +211,9 @@ async function generateSignedPdfAndEmail({
   // 1. Generate PDF with Korean font
   const pdf = await PDFDocument.create();
 
-  // Load Korean font — try local file first, then fetch from own domain
-  let font;
-  let fontLoaded = false;
-
-  // 1차: 로컬 파일 시스템 (여러 경로 시도)
-  const fontPaths = [
-    join(process.cwd(), "public", "fonts", "NotoSansKR-Subset.ttf"),
-    join(process.cwd(), ".next", "static", "fonts", "NotoSansKR-Subset.ttf"),
-    "/var/task/public/fonts/NotoSansKR-Subset.ttf",
-  ];
-  for (const fontPath of fontPaths) {
-    try {
-      const fontBytes = await readFile(fontPath);
-      if (fontBytes.length > 1000) {
-        font = await pdf.embedFont(fontBytes, { subset: true });
-        fontLoaded = true;
-        break;
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  // 2차: 자기 도메인에서 fetch
-  if (!fontLoaded) {
-    const fontUrls = [
-      "https://haetae.studio/fonts/NotoSansKR-Subset.ttf",
-      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/fonts/NotoSansKR-Subset.ttf` : "",
-    ].filter(Boolean);
-
-    for (const url of fontUrls) {
-      try {
-        const fontRes = await fetch(url);
-        if (fontRes.ok) {
-          const fontBytes = new Uint8Array(await fontRes.arrayBuffer());
-          if (fontBytes.length > 1000) {
-            font = await pdf.embedFont(fontBytes, { subset: true });
-            fontLoaded = true;
-            break;
-          }
-        }
-      } catch {
-        continue;
-      }
-    }
-  }
-
-  // 3차: Fallback
-  if (!fontLoaded) {
-    console.error("[CONTRACT] All font loading methods failed, using Helvetica");
-    font = await pdf.embedFont(StandardFonts.Helvetica);
-  }
+  // Load Korean font from embedded base64
+  const fontBytes = Buffer.from(KOREAN_FONT_BASE64, "base64");
+  const font = await pdf.embedFont(fontBytes, { subset: true });
 
   const fontSize = 10;
   const margin = 50;
