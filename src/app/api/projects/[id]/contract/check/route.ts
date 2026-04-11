@@ -17,10 +17,13 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get contract
+    // Get contract — include signed fields so polling doesn't wipe out
+    // client_name / client_signature_url / signed_at after signing.
     const { data: contract } = await supabase
       .from("contracts")
-      .select("id, status, contract_html, admin_signature_url")
+      .select(
+        "id, status, contract_html, admin_signature_url, client_signature_url, client_name, signed_at"
+      )
       .eq("project_id", id)
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
