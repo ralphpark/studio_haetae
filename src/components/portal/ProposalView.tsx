@@ -598,7 +598,9 @@ export function ProposalView({
       )}
 
       {/* Step 6: 킥오프 (계약 완료 후 표시) */}
-      {currentStep >= 6 && <KickoffCard discordInvite={discordInvite} />}
+      {(currentStep >= 6 || contract?.status === "signed") && (
+        <KickoffCard discordInvite={discordInvite} />
+      )}
 
       {/* Proposal Modal */}
       <AnimatePresence>

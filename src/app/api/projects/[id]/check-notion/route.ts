@@ -20,7 +20,7 @@ export async function GET(
 
     const { data: project } = await supabase
       .from("projects")
-      .select("notion_page_id, docs_confirmed, notion_public_url, document_urls, planning_doc, estimate")
+      .select("notion_page_id, docs_confirmed, notion_public_url, document_urls, planning_doc, estimate, step")
       .eq("id", id)
       .eq("user_id", user.id)
       .single();
@@ -91,9 +91,15 @@ export async function GET(
       const updateData: Record<string, unknown> = {
         docs_confirmed: true,
         notion_public_url: notionUrl,
-        step: 3,
-        status: "기획서 확정 완료",
       };
+
+      // Only advance step if the project hasn't already moved past docs confirmation.
+      // Otherwise later stages (meeting booked=4, contract ready=5, signed=6) get
+      // stomped back to 3 on every poll and the kickoff / contract UI disappears.
+      if ((project.step ?? 0) < 3) {
+        updateData.step = 3;
+        updateData.status = "기획서 확정 완료";
+      }
 
       if (notionDocs?.planningDoc) {
         updateData.planning_doc = notionDocs.planningDoc;
