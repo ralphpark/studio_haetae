@@ -38,21 +38,28 @@ export function ContractCard({
       const res = await fetch(`/api/projects/${projectId}/contract/check`);
       const data = await res.json();
       if (data.ready && data.contract) {
-        setContract(data.contract);
-        // Reset signing UI state when contract becomes ready again (re-confirmation)
-        if (data.contract.status === "ready") {
-          setConsent(false);
-          setSignerName(data.contract.client_name || "");
-          setSignError("");
-        }
+        // Only reset signing UI on status transition (e.g., preparing → ready),
+        // not on every poll — otherwise it wipes out user input (name, consent).
+        setContract((prev) => {
+          const wasReady = prev?.status === "ready" || prev?.status === "signed";
+          const isReady = data.contract.status === "ready";
+          if (!wasReady && isReady) {
+            setConsent(false);
+            setSignerName(data.contract.client_name || "");
+            setSignError("");
+          }
+          return data.contract;
+        });
       } else if (!data.ready && data.status === "preparing") {
         // Admin unchecked → contract reset to preparing
-        setContract((prev) =>
-          prev ? { ...prev, status: "preparing" } : prev
-        );
-        setConsent(false);
-        setSignerName("");
-        setSignError("");
+        setContract((prev) => {
+          if (prev?.status !== "preparing") {
+            setConsent(false);
+            setSignerName("");
+            setSignError("");
+          }
+          return prev ? { ...prev, status: "preparing" } : prev;
+        });
       }
     } catch {
       // ignore
