@@ -60,7 +60,7 @@ export async function POST(
     }
 
     const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const features = Array.isArray(project.features) ? project.features.join(", ") : "";
 
