@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { Mistral } from "@mistralai/mistralai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { appendProposalToNotion } from "@/utils/notion";
 
 const SYSTEM_PROMPT = `당신은 'Studio HaeTae'의 프로젝트 매니저입니다.
@@ -63,7 +63,7 @@ export async function POST(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const apiKey = process.env.MISTRAL_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
         { error: "AI API key not configured" },
@@ -71,7 +71,14 @@ export async function POST(
       );
     }
 
-    const client = new Mistral({ apiKey });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash",
+      systemInstruction: SYSTEM_PROMPT,
+      generationConfig: {
+        responseMimeType: "application/json",
+      },
+    });
 
     const features = Array.isArray(project.features)
       ? project.features.join(", ")
@@ -114,25 +121,19 @@ ${project.message ? `- 추가 요청: ${project.message}` : ""}
 - 복붙 느낌의 뻔한 표현 금지 (예: "원하시는 퀄리티로 개발 가능합니다")
 - 모든 포트폴리오 나열 금지 — 해당 프로젝트와 관련 높은 내용만 선별 언급`;
 
-    const response = await client.chat.complete({
-      model: "mistral-large-latest",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userPrompt },
-      ],
-      responseFormat: { type: "json_object" },
-    });
-
-    const text = response.choices?.[0]?.message?.content || "";
+    const response = await model.generateContent(userPrompt);
+    const text = response.response.text();
 
     let proposal;
     try {
-      proposal = JSON.parse(typeof text === "string" ? text : "");
+      proposal = JSON.parse(text);
     } catch {
-      const jsonMatch = typeof text === "string" ? text.match(/\{[\s\S]*\}/) : null;
+      const cleaned = text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         proposal = JSON.parse(jsonMatch[0]);
       } else {
+        console.error("[PROPOSAL] Failed to parse:", text?.substring(0, 500));
         return NextResponse.json(
           { error: "Failed to parse AI response" },
           { status: 500 }
